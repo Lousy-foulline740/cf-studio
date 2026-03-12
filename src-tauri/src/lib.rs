@@ -39,6 +39,7 @@ pub fn run() {
             greet,
             get_cloudflare_token,
             d1::fetch_d1_databases,
+            d1::execute_d1_query,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
