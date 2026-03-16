@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { DatabasesView } from "@/components/DatabasesView";
 import {
   Database,
@@ -10,9 +11,21 @@ import {
   Moon,
   Monitor,
   CloudCog,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme, type Theme } from "@/components/ThemeProvider";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  useAppStore,
+  selectSetDatabases,
+} from "@/store/useAppStore";
+import type { D1Database } from "@/hooks/useCloudflare";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface NavItem {
@@ -139,9 +152,11 @@ interface TitleBarProps {
   collapsed: boolean;
   onToggle: () => void;
   title: string;
+  isRefreshing: boolean;
+  onRefresh: () => void;
 }
 
-function TitleBar({ collapsed, onToggle, title }: TitleBarProps) {
+function TitleBar({ collapsed, onToggle, title, isRefreshing, onRefresh }: TitleBarProps) {
   return (
     <header
       // Tauri: makes the entire bar draggable to move the window
@@ -178,6 +193,34 @@ function TitleBar({ collapsed, onToggle, title }: TitleBarProps) {
           {title}
         </span>
       </div>
+
+      {/* Global refresh — not draggable */}
+      <div data-tauri-drag-region="false" className="flex items-center pr-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className={cn(
+                "flex items-center justify-center w-8 h-8 rounded-md",
+                "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "disabled:opacity-40 disabled:cursor-not-allowed"
+              )}
+              aria-label="Refresh data"
+            >
+              <RefreshCw
+                size={14}
+                strokeWidth={1.75}
+                className={cn(isRefreshing && "animate-spin")}
+              />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            {isRefreshing ? "Refreshing…" : "Refresh Data"}
+          </TooltipContent>
+        </Tooltip>
+      </div>
     </header>
   );
 }
@@ -198,33 +241,59 @@ function PageContent({ activeId }: { activeId: string }) {
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [activeId, setActiveId] = useState("d1");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const setDatabases = useAppStore(selectSetDatabases);
 
   const currentNav = NAV_ITEMS.find((n) => n.id === activeId);
   const pageTitle = currentNav?.label ?? "CF Studio";
 
-  return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
-      {/* Sidebar */}
-      <Sidebar
-        collapsed={collapsed}
-        activeId={activeId}
-        onNavigate={setActiveId}
-      />
+  /** Bypasses the cache — always fetches fresh data from Cloudflare. */
+  const handleGlobalRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      // Fetch current active section. Extend this switch as new tabs are added.
+      if (activeId === "d1") {
+        const databases = await invoke<D1Database[]>("fetch_d1_databases");
+        setDatabases(databases); // overwrites Zustand cache + updates timestamp
+      }
+      // KV: invoke("fetch_kv_namespaces") → setKvNamespaces(result)  [future]
+    } catch {
+      // Errors surface in the individual view's own error state;
+      // a global toast can be added here later.
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [activeId, isRefreshing, setDatabases]);
 
-      {/* Main column */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        {/* Title bar */}
-        <TitleBar
+  return (
+    <TooltipProvider delayDuration={400}>
+      <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+        {/* Sidebar */}
+        <Sidebar
           collapsed={collapsed}
-          onToggle={() => setCollapsed((c) => !c)}
-          title={pageTitle}
+          activeId={activeId}
+          onNavigate={setActiveId}
         />
 
-        {/* Content area */}
-        <main className="flex-1 overflow-hidden p-6">
-          <PageContent activeId={activeId} />
-        </main>
+        {/* Main column */}
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          {/* Title bar */}
+          <TitleBar
+            collapsed={collapsed}
+            onToggle={() => setCollapsed((c) => !c)}
+            title={pageTitle}
+            isRefreshing={isRefreshing}
+            onRefresh={handleGlobalRefresh}
+          />
+
+          {/* Content area */}
+          <main className="flex-1 overflow-hidden p-6">
+            <PageContent activeId={activeId} />
+          </main>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }
