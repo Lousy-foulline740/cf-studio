@@ -25,6 +25,7 @@ import { Key, Table2, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseSQLiteSchemaToGraph, type TableNodeData } from "@/utils/schemaParser";
 import type { D1TableSchema } from "@/hooks/useCloudflare";
+import { useTheme } from "@/components/ThemeProvider";
 
 // ── Custom TableNode ──────────────────────────────────────────────────────────
 
@@ -44,10 +45,10 @@ function TableNode({ data, selected }: NodeProps<Node<TableNodeData>>) {
       {/* Table header */}
       <div className={cn(
         "flex items-center gap-2 px-3 py-2 border-b border-border",
-        "bg-primary/10"
+        "bg-muted text-muted-foreground"
       )}>
         <Table2 size={12} strokeWidth={2} className="text-primary shrink-0" />
-        <span className="font-semibold text-xs text-foreground tracking-tight truncate">
+        <span className="font-semibold text-xs tracking-tight truncate">
           {tableName}
         </span>
       </div>
@@ -141,6 +142,8 @@ interface SchemaVisualizerProps {
 }
 
 export function SchemaVisualizer({ tables }: SchemaVisualizerProps) {
+  const { resolvedTheme } = useTheme();
+
   // Parse the schema once when tables change
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
     () => parseSQLiteSchemaToGraph(tables),
@@ -181,6 +184,7 @@ export function SchemaVisualizer({ tables }: SchemaVisualizerProps) {
   return (
     <div className="h-full w-full" style={{ background: "hsl(var(--background))" }}>
       <ReactFlow
+        colorMode={resolvedTheme}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -215,10 +219,10 @@ export function SchemaVisualizer({ tables }: SchemaVisualizerProps) {
 
         {/* Mini-map */}
         <MiniMap
-          nodeColor={() => "hsl(var(--primary) / 0.3)"}
+          nodeColor={() => "hsl(var(--muted))"}
           maskColor="hsl(var(--background) / 0.7)"
           style={{
-            background: "hsl(var(--card))",
+            background: "hsl(var(--background))",
             border: "1px solid hsl(var(--border))",
             borderRadius: 8,
             bottom: 16,
