@@ -1,9 +1,9 @@
 // DatabaseExplorer.tsx
 //
 // Schema Visualizer + Data Browser for a selected D1 table.
-// Tabs: Schema (CREATE TABLE SQL) | Data (paginated row grid)
+// Tabs (in order): SQL Editor | Data | Schema | Visual Schema
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft, Table2, RefreshCw, Database,
   ChevronRight, AlertCircle, BookOpen,
@@ -351,15 +351,32 @@ interface DatabaseExplorerProps {
 
 export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
   const [selectedTable, setSelectedTable] = useState<D1TableSchema | null>(null);
+  const [systemOpen, setSystemOpen] = useState(false);
+  const userPickedRef = useRef(false);          // true once user manually clicks a table
   const { state, refresh } = useD1Schema(database.uuid);
 
   const isLoading = state.status === "idle" || state.status === "loading";
-  const tables = state.status === "success" ? state.data : [];
+  const allTables  = state.status === "success" ? state.data : [];
+  const userTables = allTables.filter((t) => !t.name.startsWith("_cf_"));
+  const sysTables  = allTables.filter((t) => t.name.startsWith("_cf_"));
 
-  // Reset selected table when navigating back and forth
+  // Auto-select the first user table when the list loads — skip if user already picked one.
+  useEffect(() => {
+    if (userPickedRef.current) return;
+    if (userTables.length > 0) {
+      setSelectedTable(userTables[0]);
+    }
+  // Only run when the list content genuinely changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.status]);
+
   const handleTableSelect = (table: D1TableSchema) => {
+    userPickedRef.current = true;
     setSelectedTable(table);
   };
+
+  // Pass the full DB-level schema (user + system) to the ER visualizer.
+  const tables = allTables;
 
   return (
     <div className="flex flex-col h-full gap-0 min-h-0">
@@ -404,7 +421,7 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
               Tables
             </span>
             {state.status === "success" && (
-              <span className="text-[10px] text-muted-foreground/40">{tables.length}</span>
+              <span className="text-[10px] text-muted-foreground/40">{userTables.length}</span>
             )}
           </div>
           <ScrollArea className="flex-1">
@@ -418,11 +435,12 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
                 </div>
               )}
 
-              {state.status === "success" && tables.length === 0 && (
+              {state.status === "success" && userTables.length === 0 && sysTables.length === 0 && (
                 <p className="text-xs text-muted-foreground text-center py-6 px-2">No tables found</p>
               )}
 
-              {state.status === "success" && tables.map((table) => (
+              {/* User tables */}
+              {state.status === "success" && userTables.map((table) => (
                 <TableListItem
                   key={table.name}
                   table={table}
@@ -430,20 +448,49 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
                   onClick={() => handleTableSelect(table)}
                 />
               ))}
+
+              {/* System / _cf_ tables — collapsible */}
+              {state.status === "success" && sysTables.length > 0 && (
+                <div className="mt-1">
+                  <button
+                    onClick={() => setSystemOpen((o) => !o)}
+                    className={cn(
+                      "flex items-center gap-1.5 w-full px-2 py-1 rounded-md",
+                      "text-[10px] uppercase tracking-widest text-muted-foreground/40",
+                      "hover:text-muted-foreground/60 transition-colors"
+                    )}
+                  >
+                    <ChevronRight
+                      size={10}
+                      strokeWidth={2}
+                      className={cn("transition-transform", systemOpen && "rotate-90")}
+                    />
+                    System ({sysTables.length})
+                  </button>
+                  {systemOpen && sysTables.map((table) => (
+                    <TableListItem
+                      key={table.name}
+                      table={table}
+                      active={selectedTable?.name === table.name}
+                      onClick={() => handleTableSelect(table)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </ScrollArea>
         </div>
 
-        {/* Right: tabbed content — always shown, Visual Schema works without a selected table */}
+        {/* Right: tabbed content */}
         <div className="flex-1 min-w-0 flex flex-col bg-background">
-          <Tabs defaultValue="erd" className="flex flex-col h-full min-h-0">
+          <Tabs defaultValue="data" className="flex flex-col h-full min-h-0">
             <div className="border-b border-border px-3 pt-2 pb-0 shrink-0 bg-muted/10">
               <TabsList className="h-8 bg-transparent p-0 gap-0">
                 {([
-                  { value: "erd",    Icon: Network,   label: "Visual Schema" },
-                  { value: "schema", Icon: Code2,     label: "Schema"       },
-                  { value: "data",   Icon: Sheet,      label: "Data"         },
-                  { value: "sql",    Icon: Terminal,   label: "SQL Editor"  },
+                  { value: "sql",    Icon: Terminal, label: "SQL Editor"   },
+                  { value: "data",   Icon: Sheet,    label: "Data"         },
+                  { value: "schema", Icon: Code2,    label: "Schema"       },
+                  { value: "visual", Icon: Network,  label: "Visual Schema" },
                 ] as const).map(({ value, Icon, label }) => (
                   <TabsTrigger
                     key={value}
@@ -462,16 +509,9 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
               </TabsList>
             </div>
 
-            {/* Visual Schema — always available, shows entire DB graph */}
-            <TabsContent value="erd" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
-              <SchemaVisualizer tables={tables} />
-            </TabsContent>
-
-            {/* Schema — requires a selected table */}
-            <TabsContent value="schema" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
-              {selectedTable
-                ? <SchemaTab table={selectedTable} />
-                : <PanelMessage icon={BookOpen} title="Select a table" body="Click a table name on the left to view its CREATE TABLE statement" />}
+            {/* SQL Editor — always available */}
+            <TabsContent value="sql" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
+              <QueryEditor databaseId={database.uuid} />
             </TabsContent>
 
             {/* Data — requires a selected table */}
@@ -481,9 +521,16 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
                 : <PanelMessage icon={Sheet} title="Select a table" body="Click a table name on the left to browse its rows" />}
             </TabsContent>
 
-            {/* SQL Editor — always available */}
-            <TabsContent value="sql" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
-              <QueryEditor databaseId={database.uuid} />
+            {/* Schema — requires a selected table */}
+            <TabsContent value="schema" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
+              {selectedTable
+                ? <SchemaTab table={selectedTable} />
+                : <PanelMessage icon={BookOpen} title="Select a table" body="Click a table name on the left to view its CREATE TABLE statement" />}
+            </TabsContent>
+
+            {/* Visual Schema — always available, shows entire DB graph */}
+            <TabsContent value="visual" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
+              <SchemaVisualizer tables={tables} />
             </TabsContent>
           </Tabs>
         </div>
