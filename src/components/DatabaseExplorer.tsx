@@ -8,9 +8,10 @@ import {
   ArrowLeft, Table2, RefreshCw, Database,
   ChevronRight, AlertCircle, BookOpen,
   ChevronLeft, ChevronRight as ChevronRightIcon,
-  Sheet, Code2, Terminal,
+  Sheet, Code2, Terminal, Network,
 } from "lucide-react";
 import { QueryEditor } from "@/components/QueryEditor";
+import { SchemaVisualizer } from "@/components/SchemaVisualizer";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -433,53 +434,58 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
           </ScrollArea>
         </div>
 
-        {/* Right: tabbed content */}
+        {/* Right: tabbed content — always shown, Visual Schema works without a selected table */}
         <div className="flex-1 min-w-0 flex flex-col bg-background">
-          {!selectedTable ? (
-            <PanelMessage
-              icon={BookOpen}
-              title="Select a table"
-              body="Click a table name to view its schema and data"
-            />
-          ) : (
-            <Tabs defaultValue="schema" className="flex flex-col h-full min-h-0">
-              <div className="border-b border-border px-3 pt-2 pb-0 shrink-0 bg-muted/10">
-                <TabsList className="h-8 bg-transparent p-0 gap-0">
-                  {([
-                    { value: "schema", Icon: Code2,    label: "Schema"     },
-                    { value: "data",   Icon: Sheet,     label: "Data"       },
-                    { value: "sql",    Icon: Terminal,  label: "SQL Editor" },
-                  ] as const).map(({ value, Icon, label }) => (
-                    <TabsTrigger
-                      key={value}
-                      value={value}
-                      className={cn(
-                        "rounded-none h-8 px-4 text-xs font-medium border-b-2 border-transparent",
-                        "data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent",
-                        "data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground",
-                        "transition-colors"
-                      )}
-                    >
-                      <Icon size={12} strokeWidth={2} className="mr-1.5" />
-                      {label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </div>
+          <Tabs defaultValue="erd" className="flex flex-col h-full min-h-0">
+            <div className="border-b border-border px-3 pt-2 pb-0 shrink-0 bg-muted/10">
+              <TabsList className="h-8 bg-transparent p-0 gap-0">
+                {([
+                  { value: "erd",    Icon: Network,   label: "Visual Schema" },
+                  { value: "schema", Icon: Code2,     label: "Schema"       },
+                  { value: "data",   Icon: Sheet,      label: "Data"         },
+                  { value: "sql",    Icon: Terminal,   label: "SQL Editor"  },
+                ] as const).map(({ value, Icon, label }) => (
+                  <TabsTrigger
+                    key={value}
+                    value={value}
+                    className={cn(
+                      "rounded-none h-8 px-4 text-xs font-medium border-b-2 border-transparent",
+                      "data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent",
+                      "data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground",
+                      "transition-colors"
+                    )}
+                  >
+                    <Icon size={12} strokeWidth={2} className="mr-1.5" />
+                    {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
 
-              <TabsContent value="schema" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
-                <SchemaTab table={selectedTable} />
-              </TabsContent>
+            {/* Visual Schema — always available, shows entire DB graph */}
+            <TabsContent value="erd" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
+              <SchemaVisualizer tables={tables} />
+            </TabsContent>
 
-              <TabsContent value="data" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
-                <DataTab databaseId={database.uuid} table={selectedTable} />
-              </TabsContent>
+            {/* Schema — requires a selected table */}
+            <TabsContent value="schema" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
+              {selectedTable
+                ? <SchemaTab table={selectedTable} />
+                : <PanelMessage icon={BookOpen} title="Select a table" body="Click a table name on the left to view its CREATE TABLE statement" />}
+            </TabsContent>
 
-              <TabsContent value="sql" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
-                <QueryEditor databaseId={database.uuid} />
-              </TabsContent>
-            </Tabs>
-          )}
+            {/* Data — requires a selected table */}
+            <TabsContent value="data" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
+              {selectedTable
+                ? <DataTab databaseId={database.uuid} table={selectedTable} />
+                : <PanelMessage icon={Sheet} title="Select a table" body="Click a table name on the left to browse its rows" />}
+            </TabsContent>
+
+            {/* SQL Editor — always available */}
+            <TabsContent value="sql" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
+              <QueryEditor databaseId={database.uuid} />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
