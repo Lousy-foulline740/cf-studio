@@ -55,13 +55,15 @@ Ensure you have the following installed on your system:
 
 ## Roadmap
 
-  - [x] Initial UI shell and OKLCH theme system
-  - [x] Wrangler auto-authentication logic (Rust)
-  - [ ] D1 database listing and table schema viewer
-  - [ ] SQL query execution and result grid
-  - [ ] KV namespace CRUD operations
-  - [ ] Bulk data Export/Import (CSV/JSON)
-  - [ ] R2 Storage explorer (Upcoming)
+- [x] Initial UI shell and OKLCH theme system
+- [x] Wrangler auto-authentication & session logic
+- [x] D1 database listing and data grid viewer
+- [x] SQL query execution engine
+- [x] Interactive Visual Schema (ER Diagram)
+- [ ] R2 Storage Explorer (In Progress)
+- [ ] KV namespace CRUD operations
+- [ ] Bulk data Export/Import (CSV/JSON)
+- More features coming soon
 
 ## Contributing
 
