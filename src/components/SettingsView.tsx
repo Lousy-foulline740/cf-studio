@@ -12,6 +12,7 @@ export function SettingsView() {
   const { theme, setTheme } = useTheme();
   const userProfile = useAppStore(s => s.userProfile);
   const cloudflareAccountId = useAppStore(s => s.cloudflareAccountId);
+  const activeAccount = useAppStore(s => s.activeAccount);
   const tableDensity = useAppStore(s => s.tableDensity);
   const setTableDensity = useAppStore(s => s.setTableDensity);
   const setCloudflareAccountId = useAppStore(s => s.setCloudflareAccountId);
@@ -71,7 +72,7 @@ export function SettingsView() {
                   <div className="space-y-2">
                     <Label>Cloudflare Account ID</Label>
                     <div className="px-3 py-2 text-sm bg-muted/50 rounded-md font-mono border border-border truncate text-muted-foreground select-all h-9 flex items-center">
-                      {cloudflareAccountId || "Not available"}
+                      {activeAccount?.id || cloudflareAccountId || "Not available"}
                     </div>
                   </div>
                   <div className="space-y-2">

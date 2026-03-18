@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-shell";
 import { DatabasesView } from "@/components/DatabasesView";
+import { SettingsView } from "@/components/SettingsView";
 import {
   Database,
   KeyRound,
@@ -313,6 +314,7 @@ function TitleBar({ collapsed, onToggle, title }: TitleBarProps) {
 // ── Simple page router ────────────────────────────────────────────────────────
 function PageContent({ activeId }: { activeId: string }) {
   if (activeId === "d1") return <DatabasesView />;
+  if (activeId === "settings") return <SettingsView />;
   // KV and Settings views will be added in subsequent steps
   return (
     <div className="flex flex-col items-center justify-center h-full text-center gap-2">
