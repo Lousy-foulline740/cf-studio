@@ -3,7 +3,7 @@
 // D1 Databases listing page — auto-fetches from the Cloudflare API.
 // Clicking a row drills into DatabaseExplorer for schema inspection.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RefreshCw, Database, Terminal, AlertCircle, Loader2, HardDrive, ChevronRight } from "lucide-react";
 import {
   Table,
@@ -16,7 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useD1Databases, type D1Database } from "@/hooks/useCloudflare";
+import { useD1Databases, type D1Database, invokeCloudflare } from "@/hooks/useCloudflare";
 import { DatabaseExplorer } from "@/components/DatabaseExplorer";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -42,6 +42,45 @@ function formatBytes(bytes?: number): string {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
+
+export interface D1DatabaseInfo {
+  uuid: string;
+  name: string;
+  num_tables?: number | null;
+  database_size?: number | null;
+}
+
+function NumTablesCell({ dbName }: { dbName: string }) {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchCount = async () => {
+      try {
+        const info = await invokeCloudflare<D1DatabaseInfo>("get_d1_database_info", { name: dbName });
+        if (mounted && info.num_tables != null) {
+          setCount(info.num_tables);
+        } else if (mounted) {
+          setCount(0);
+        }
+      } catch {
+        if (mounted) setCount(0);
+      }
+    };
+    fetchCount();
+    return () => { mounted = false; };
+  }, [dbName]);
+
+  if (count === null) {
+    return <span className="text-muted-foreground/50 text-xs animate-pulse">—</span>;
+  }
+
+  return (
+    <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wide">
+      {new Intl.NumberFormat("en-US").format(count)}
+    </Badge>
+  );
+}
 
 function LoadingSkeleton() {
   return (
@@ -168,15 +207,9 @@ function DatabaseRow({ db, onClick }: DatabaseRowProps) {
         {formatDate(db.created_at)}
       </TableCell>
 
-      {/* Version */}
+      {/* Tables (Live Count) */}
       <TableCell className="py-3.5">
-        {db.version ? (
-          <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wide">
-            {db.version}
-          </Badge>
-        ) : (
-          <span className="text-muted-foreground/50 text-sm">—</span>
-        )}
+        <NumTablesCell dbName={db.name} />
       </TableCell>
 
       {/* Size */}
@@ -258,7 +291,7 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  {["Name", "Database ID", "Created At", "Version", "Size", ""].map((h) => (
+                  {["Name", "Database ID", "Created At", "Tables", "Size", ""].map((h) => (
                     <TableHead
                       key={h}
                       className="text-xs font-medium uppercase tracking-wider text-muted-foreground py-2.5"

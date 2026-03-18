@@ -227,15 +227,20 @@ function DataTab({ databaseId, table }: DataTabProps) {
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30 sticky top-0 z-10">
                   {/* Row number gutter */}
-                  <TableHead className={`w-10 text-center text-[10px] text-muted-foreground/40 font-mono px-2 shrink-0 ${paddingY}`}>
+                  <TableHead className={`w-10 text-center text-[10px] text-muted-foreground/40 font-mono px-2 shrink-0 border-r border-border ${paddingY}`}>
                     #
                   </TableHead>
                   {state.data.columns.map((col) => (
                     <TableHead
-                      key={col}
-                      className={`text-xs font-medium uppercase tracking-wider text-muted-foreground whitespace-nowrap ${paddingY}`}
+                      key={col.name}
+                      className={`text-xs font-medium text-foreground whitespace-nowrap bg-muted/40 border-r border-border last:border-r-0 ${paddingY} px-3`}
                     >
-                      {col}
+                      <div className="flex items-center gap-2">
+                        <span>{col.name}</span>
+                        <span className="text-muted-foreground/60 text-[10px] font-mono lowercase tracking-wide">
+                          {col.type}
+                        </span>
+                      </div>
                     </TableHead>
                   ))}
                 </TableRow>
@@ -247,25 +252,26 @@ function DataTab({ databaseId, table }: DataTabProps) {
                     className="hover:bg-accent/30 transition-colors font-mono text-xs"
                   >
                     {/* Row number */}
-                    <TableCell className={`text-center text-muted-foreground/30 px-2 select-none tabular-nums ${paddingY}`}>
+                    <TableCell className={`text-center text-muted-foreground/30 px-2 select-none tabular-nums border-r border-border/50 ${paddingY}`}>
                       {state.data.offset + ri + 1}
                     </TableCell>
                     {state.data.columns.map((col) => {
-                      const val = row[col];
+                      const val = row[col.name];
                       const isNull = val === null || val === undefined;
-                      const isNum = typeof val === "number";
+                      const isEmpty = val === "";
                       return (
                         <TableCell
-                          key={col}
-                          className={cn(
-                            `max-w-[260px] truncate ${paddingY}`,
-                            isNull && "text-muted-foreground/30 italic",
-                            isNum && "text-sky-400 tabular-nums",
-                            !isNull && !isNum && "text-foreground"
-                          )}
+                          key={col.name}
+                          className={`max-w-[260px] truncate px-3 border-r border-border/50 last:border-r-0 ${paddingY}`}
                           title={isNull ? "NULL" : String(val)}
                         >
-                          {isNull ? "NULL" : String(val)}
+                          {isNull ? (
+                            <span className="text-muted-foreground/30 italic text-xs uppercase">NULL</span>
+                          ) : isEmpty ? (
+                            <span className="text-muted-foreground/30 italic text-xs uppercase">EMPTY</span>
+                          ) : (
+                            <span className="text-foreground/90">{String(val)}</span>
+                          )}
                         </TableCell>
                       );
                     })}

@@ -28,8 +28,8 @@ export interface KVNamespace {
 
 // ── Cache TTL ─────────────────────────────────────────────────────────────────
 
-/** How long cached data is considered fresh (ms). Default: 5 minutes. */
-export const CACHE_TTL_MS = 5 * 60 * 1_000;
+/** How long cached data is considered fresh (ms). Default: 10 minutes. */
+export const CACHE_TTL_MS = 10 * 60 * 1_000;
 
 export function isCacheStale(lastFetched: number | null): boolean {
   if (lastFetched === null) return true;
@@ -57,6 +57,10 @@ interface AppState {
   /** Unix timestamp (ms) of the last successful KV fetch, or null. */
   kvLastFetched: number | null;
 
+  // ── Session Cache (Volatile, not persisted) ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  queryCache: Record<string, { data: any; timestamp: number }>;
+
   // ── Actions ──
   setUserProfile: (profile: UserProfile | null) => void;
   setCloudflareAccountId: (id: string | null) => void;
@@ -76,6 +80,10 @@ interface AppState {
    * Call this when the user switches Cloudflare accounts or logs out.
    */
   clearCache: () => void;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setQueryCacheItem: (key: string, data: any) => void;
+  clearQueryCache: (prefix?: string) => void;
 }
 
 // ── Store implementation ──────────────────────────────────────────────────────
@@ -94,6 +102,7 @@ export const useAppStore = create<AppState>()(
       isRefreshingSession: false,
       lastFetched: null,
       kvLastFetched: null,
+      queryCache: {},
 
       // ── Actions ──
       setUserProfile: (profile) => set({ userProfile: profile }),
@@ -118,6 +127,25 @@ export const useAppStore = create<AppState>()(
           kvNamespaces: [],
           lastFetched: null,
           kvLastFetched: null,
+          queryCache: {},
+        }),
+
+      setQueryCacheItem: (key, data) =>
+        set((state) => ({
+          queryCache: {
+            ...state.queryCache,
+            [key]: { data, timestamp: Date.now() },
+          },
+        })),
+
+      clearQueryCache: (prefix) =>
+        set((state) => {
+          if (!prefix) return { queryCache: {} };
+          const next = { ...state.queryCache };
+          for (const k of Object.keys(next)) {
+            if (k.startsWith(prefix)) delete next[k];
+          }
+          return { queryCache: next };
         }),
     }),
     {

@@ -14,6 +14,7 @@ import {
   selectDatabases,
   selectLastFetched,
   selectSetDatabases,
+  CACHE_TTL_MS,
 } from "@/store/useAppStore";
 
 // ── API Interceptor ────────────────────────────────────────────────────────────
@@ -208,12 +209,26 @@ const SCHEMA_SQL =
  * Resolves account_id automatically via `get_cloudflare_token`.
  */
 export function useD1Schema(databaseId: string) {
-  const [state, setState] = useState<AsyncState<D1TableSchema[]>>({
-    status: "idle",
+  const cacheKey = `schema_${databaseId}`;
+  const [state, setState] = useState<AsyncState<D1TableSchema[]>>(() => {
+    const cached = useAppStore.getState().queryCache[cacheKey];
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return { status: "success", data: cached.data };
+    }
+    return { status: "idle" };
   });
 
-  const fetch = useCallback(async () => {
+  const fetch = useCallback(async (force = false) => {
     if (!databaseId) return;
+
+    if (!force) {
+      const cached = useAppStore.getState().queryCache[cacheKey];
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        setState({ status: "success", data: cached.data });
+        return;
+      }
+    }
+
     setState({ status: "loading" });
     try {
       // Resolve account_id from the local Wrangler session.
@@ -252,17 +267,18 @@ export function useD1Schema(databaseId: string) {
         sql: r["sql"] != null ? String(r["sql"]) : null,
       }));
 
+      useAppStore.getState().setQueryCacheItem(cacheKey, tables);
       setState({ status: "success", data: tables });
     } catch (err) {
       setState({ status: "error", message: String(err) });
     }
-  }, [databaseId]);
+  }, [databaseId, cacheKey]);
 
   useEffect(() => {
     fetch();
   }, [fetch]);
 
-  return { state, refresh: fetch };
+  return { state, refresh: () => fetch(true) };
 }
 
 // Module-level store for the resolved account ID — set by useD1Databases
@@ -277,8 +293,13 @@ export function setResolvedAccountId(id: string) {
 
 const PAGE_LIMIT = 100;
 
+export interface D1Column {
+  name: string;
+  type: string;
+}
+
 export interface D1TableData {
-  columns: string[];
+  columns: D1Column[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rows: Record<string, any>[];
   totalFetched: number;
@@ -295,16 +316,30 @@ export function useD1TableData(
   tableName: string,
   offset: number = 0
 ) {
-  const [state, setState] = useState<AsyncState<D1TableData>>({
-    status: "idle",
+  const cacheKey = `data_${databaseId}_${tableName}_${offset}`;
+  const [state, setState] = useState<AsyncState<D1TableData>>(() => {
+    const cached = useAppStore.getState().queryCache[cacheKey];
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return { status: "success", data: cached.data };
+    }
+    return { status: "idle" };
   });
 
-  const fetch = useCallback(async () => {
+  const fetch = useCallback(async (force = false) => {
     if (!databaseId || !tableName) return;
+
+    if (!force) {
+      const cached = useAppStore.getState().queryCache[cacheKey];
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        setState({ status: "success", data: cached.data });
+        return;
+      }
+    }
+
     setState({ status: "loading" });
     try {
       const accountId = resolvedAccountId;
-      const sql = `SELECT * FROM "${tableName}" LIMIT ${PAGE_LIMIT} OFFSET ${offset};`;
+      const sql = `PRAGMA table_info("${tableName}"); SELECT * FROM "${tableName}" LIMIT ${PAGE_LIMIT} OFFSET ${offset};`;
 
       const queryResults = await invokeCloudflare<D1QueryResult[]>("execute_d1_query", {
         accountId,
@@ -313,21 +348,34 @@ export function useD1TableData(
         params: null,
       });
 
-      const rows = queryResults[0]?.results ?? [];
-      const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+      const pragmaRows = queryResults[0]?.success ? queryResults[0].results : [];
+      const dataRows = queryResults.length > 1 ? queryResults[1].results : (queryResults[0]?.results ?? []);
 
+      const columns: D1Column[] = pragmaRows.map(r => ({
+        name: String(r.name),
+        type: String(r.type || "unknown").toLowerCase()
+      }));
+
+      // Fallback if PRAGMA fails
+      if (columns.length === 0 && dataRows.length > 0) {
+        Object.keys(dataRows[0]).forEach(k => columns.push({ name: k, type: "unknown" }));
+      }
+
+      const resultData = { columns, rows: dataRows, totalFetched: dataRows.length, offset, limit: PAGE_LIMIT };
+      useAppStore.getState().setQueryCacheItem(cacheKey, resultData);
+      
       setState({
         status: "success",
-        data: { columns, rows, totalFetched: rows.length, offset, limit: PAGE_LIMIT },
+        data: resultData,
       });
     } catch (err) {
       setState({ status: "error", message: String(err) });
     }
-  }, [databaseId, tableName, offset]);
+  }, [databaseId, tableName, offset, cacheKey]);
 
   useEffect(() => {
     fetch();
   }, [fetch]);
 
-  return { state, refresh: fetch };
+  return { state, refresh: () => fetch(true) };
 }

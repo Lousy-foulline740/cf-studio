@@ -43,6 +43,7 @@ pub fn run() {
             cloudflare_auth::fetch_cloudflare_accounts,
             d1::fetch_d1_databases,
             d1::execute_d1_query,
+            d1::get_d1_database_info,
             user::fetch_user_profile,
         ])
         .run(tauri::generate_context!())
