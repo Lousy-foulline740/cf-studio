@@ -184,11 +184,11 @@ pub async fn refresh_wrangler_token() -> Result<CloudflareCredentials, AuthError
     let output = tokio::task::spawn_blocking(|| {
         let mut cmd = if cfg!(target_os = "windows") {
             let mut c = std::process::Command::new("cmd");
-            c.args(["/c", "wrangler", "whoami"]);
+            c.args(["/c", "wrangler", "d1", "list"]);
             c
         } else {
             let mut c = std::process::Command::new("wrangler");
-            c.arg("whoami");
+            c.args(["d1", "list"]);
             c
         };
 

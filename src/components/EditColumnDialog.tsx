@@ -18,13 +18,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertTriangle, Info, List } from "lucide-react";
+import { AlertTriangle, Info, List, ArrowRight, Expand, BookOpen, X, Check, Table2 } from "lucide-react";
+import type { D1Column, D1TableSchema } from "@/hooks/useCloudflare";
 
 export interface EditColumnDialogProps {
   tableName: string;
-  column: { name: string; type: string } | null;
+  column: D1Column | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  allTables: D1TableSchema[];
 }
 
 export function EditColumnDialog({
@@ -32,21 +34,30 @@ export function EditColumnDialog({
   column,
   open,
   onOpenChange,
+  allTables,
 }: EditColumnDialogProps) {
   const [colName, setColName] = useState("");
   const [colType, setColType] = useState("");
   const [isPrimary, setIsPrimary] = useState(false);
   const [nullable, setNullable] = useState(false);
   const [isUnique, setIsUnique] = useState(false);
+  const [defaultValue, setDefaultValue] = useState("");
+  
+  // Foreign Key Dialog State
+  const [fkOpen, setFkOpen] = useState(false);
+  const [fkTable, setFkTable] = useState<string>("");
+  const [fkColumn, setFkColumn] = useState<string>("");
+  const [fkUpdateAction, setFkUpdateAction] = useState("No action");
+  const [fkDeleteAction, setFkDeleteAction] = useState("No action");
 
   useEffect(() => {
     if (column && open) {
       setColName(column.name);
       setColType(column.type || "text");
-      // Reset defaults for demo
-      setIsPrimary(false);
-      setNullable(true);
-      setIsUnique(false);
+      setIsPrimary(!!column.isPrimary);
+      setNullable(!!column.isNullable);
+      setIsUnique(false); // We don't have unique from PRAGMA easily
+      setDefaultValue(column.defaultValue || "");
     }
   }, [column, open]);
 
@@ -54,14 +65,20 @@ export function EditColumnDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-[#1c1c1c] border-[#2d2d2d] text-foreground p-0 gap-0 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        <DialogHeader className="p-6 pb-4 border-b border-[#2d2d2d] bg-[#1c1c1c] shrink-0">
-          <DialogTitle className="text-sm font-medium font-mono text-foreground/80">
+      <DialogContent className="max-w-2xl p-0 gap-0 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <DialogHeader className="p-6 pb-4 border-b border-border bg-muted/30 shrink-0">
+          <DialogTitle className="text-sm font-medium font-mono text-foreground">
             Update column <span className="text-foreground">{column.name}</span> from <span className="text-foreground">{tableName}</span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-10 bg-[#151515]">
+        <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-background">
+          <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3">
+            <p className="text-xs text-muted-foreground">
+              Column editing is preview-only right now. Support for real schema changes is coming soon.
+            </p>
+          </div>
+
           {/* General Section */}
           <div className="grid grid-cols-[1fr_2.5fr] gap-6">
             <div className="text-sm font-medium text-foreground/80">General</div>
@@ -71,7 +88,7 @@ export function EditColumnDialog({
                 <Input
                   value={colName}
                   onChange={(e) => setColName(e.target.value)}
-                  className="font-mono bg-[#1c1c1c] border-[#2d2d2d] focus-visible:ring-1 focus-visible:ring-primary h-9 text-sm"
+                  className="font-mono h-9 text-sm"
                 />
                 <p className="text-[11px] text-muted-foreground mt-1.5 leading-relaxed">
                   Recommended to use lowercase and use an underscore to separate words e.g. column_name
@@ -83,23 +100,23 @@ export function EditColumnDialog({
                   <span className="text-[10px] text-muted-foreground/60 uppercase">Optional</span>
                 </div>
                 <Textarea
-                  className="bg-[#1c1c1c] border-[#2d2d2d] focus-visible:ring-1 focus-visible:ring-primary min-h-[60px] resize-none"
+                  className="min-h-[60px] resize-none"
                 />
               </div>
             </div>
           </div>
 
-          <div className="h-[1px] w-full bg-[#2d2d2d]" />
+          <div className="h-px w-full bg-border/60" />
 
           {/* Data Type Section */}
           <div className="grid grid-cols-[1fr_2.5fr] gap-6">
             <div className="space-y-2 text-sm font-medium text-foreground/80">
               Data Type
               <div className="flex flex-col gap-2 mt-4">
-                <Button variant="outline" size="sm" className="h-7 text-xs bg-[#1c1c1c] border-[#2d2d2d] text-muted-foreground hover:text-foreground justify-start">
+                <Button variant="outline" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground justify-start">
                   + Create enum types
                 </Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs bg-[#1c1c1c] border-[#2d2d2d] text-muted-foreground hover:text-foreground justify-start">
+                <Button variant="outline" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground justify-start">
                   <Info size={12} className="mr-1.5" /> About data types
                 </Button>
               </div>
@@ -108,10 +125,10 @@ export function EditColumnDialog({
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Type</Label>
                 <Select value={colType} onValueChange={setColType}>
-                  <SelectTrigger className="w-full bg-[#1c1c1c] border-[#2d2d2d] h-9 font-mono text-sm">
+                  <SelectTrigger className="w-full h-9 font-mono text-sm">
                     <span className="text-muted-foreground/50 mr-2 text-xs">T</span> <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-[#1c1c1c] border-[#2d2d2d]">
+                  <SelectContent>
                     <SelectItem value="varchar">varchar</SelectItem>
                     <SelectItem value="text">text</SelectItem>
                     <SelectItem value="integer">integer</SelectItem>
@@ -143,7 +160,7 @@ export function EditColumnDialog({
               )}
 
               <div className="flex items-start gap-2 pt-2">
-                 <div className="mt-1 flex h-4 w-4 items-center justify-center rounded border border-[#2d2d2d] bg-[#1c1c1c]" />
+                 <div className="mt-1 flex h-4 w-4 items-center justify-center rounded border border-border bg-muted/30" />
                  <div>
                    <Label className="text-xs text-foreground font-medium">Define as Array</Label>
                    <p className="text-[10px] text-muted-foreground">Allow column to be defined as variable-length multidimensional arrays</p>
@@ -155,7 +172,9 @@ export function EditColumnDialog({
                 <div className="relative">
                   <Input
                     placeholder="NULL"
-                    className="font-mono bg-[#1c1c1c] border-[#2d2d2d] focus-visible:ring-1 focus-visible:ring-primary h-9 text-sm pr-10"
+                    value={defaultValue}
+                    onChange={(e) => setDefaultValue(e.target.value)}
+                    className="font-mono h-9 text-sm pr-10"
                   />
                   <div className="absolute right-2 top-2 text-muted-foreground/40">
                     <List size={14} />
@@ -168,26 +187,26 @@ export function EditColumnDialog({
             </div>
           </div>
 
-          <div className="h-[1px] w-full bg-[#2d2d2d]" />
+          <div className="h-px w-full bg-border/60" />
 
           {/* Foreign Keys */}
           <div className="grid grid-cols-[1fr_2.5fr] gap-6">
             <div className="text-sm font-medium text-foreground/80 text-left">Foreign Keys</div>
             <div>
-              <Button variant="outline" size="sm" className="h-7 text-xs bg-[#1c1c1c] border-[#2d2d2d] text-muted-foreground hover:text-foreground">
+              <Button variant="outline" size="sm" onClick={() => setFkOpen(true)} className="h-7 text-xs text-muted-foreground hover:text-foreground">
                 Add foreign key
               </Button>
             </div>
           </div>
 
-          <div className="h-[1px] w-full bg-[#2d2d2d]" />
+          <div className="h-px w-full bg-border/60" />
 
           {/* Constraints Section */}
           <div className="grid grid-cols-[1fr_2.5fr] gap-6 pb-6">
              <div className="text-sm font-medium text-foreground/80">Constraints</div>
              <div className="space-y-6">
                 <div className="flex items-start gap-4">
-                  <Switch checked={isPrimary} onCheckedChange={setIsPrimary} className="mt-0.5 data-[state=unchecked]:bg-[#2d2d2d]" />
+                  <Switch checked={isPrimary} onCheckedChange={setIsPrimary} className="mt-0.5" />
                   <div>
                     <Label className="text-sm font-medium">Is Primary Key</Label>
                     <p className="text-[11px] text-muted-foreground leading-relaxed mt-1 hidden lg:block">A primary key indicates that a column or group of columns can be used as a unique identifier for rows in the table</p>
@@ -195,7 +214,7 @@ export function EditColumnDialog({
                 </div>
 
                 <div className="flex items-start gap-4">
-                  <Switch checked={nullable} onCheckedChange={setNullable} className="mt-0.5 data-[state=unchecked]:bg-[#2d2d2d] data-[state=checked]:bg-emerald-500" />
+                  <Switch checked={nullable} onCheckedChange={setNullable} className="mt-0.5" />
                   <div>
                     <Label className="text-sm font-medium">Allow Nullable</Label>
                     <p className="text-[11px] text-muted-foreground leading-relaxed mt-1 hidden lg:block">Allow the column to assume a NULL value if no value is provided</p>
@@ -203,7 +222,7 @@ export function EditColumnDialog({
                 </div>
 
                 <div className="flex items-start gap-4">
-                  <Switch checked={isUnique} onCheckedChange={setIsUnique} className="mt-0.5 data-[state=unchecked]:bg-[#2d2d2d]" />
+                  <Switch checked={isUnique} onCheckedChange={setIsUnique} className="mt-0.5" />
                   <div>
                     <Label className="text-sm font-medium">Is Unique</Label>
                     <p className="text-[11px] text-muted-foreground leading-relaxed mt-1 hidden lg:block">Enforce values in the column to be unique across rows</p>
@@ -217,15 +236,15 @@ export function EditColumnDialog({
                   </div>
                   <Input
                     placeholder={`length("${column.name}") < 500`}
-                    className="font-mono bg-[#1c1c1c] border-[#2d2d2d] focus-visible:ring-1 focus-visible:ring-primary h-9 text-sm text-muted-foreground"
+                    className="font-mono h-9 text-sm text-muted-foreground"
                   />
                 </div>
              </div>
           </div>
         </div>
 
-        <DialogFooter className="p-4 border-t border-[#2d2d2d] bg-[#1c1c1c] flex justify-end gap-2 shrink-0">
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground h-8 text-xs font-medium border border-transparent hover:border-[#2d2d2d]">
+        <DialogFooter className="p-4 border-t border-border bg-muted/20 flex justify-end gap-2 shrink-0">
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="text-muted-foreground hover:text-foreground h-8 text-xs font-medium">
             Cancel
           </Button>
           <Button size="sm" onClick={() => onOpenChange(false)} className="bg-emerald-600 hover:bg-emerald-500 text-white h-8 text-xs font-medium px-4">
@@ -233,6 +252,153 @@ export function EditColumnDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* foreign key dialog stack */}
+      <Dialog open={fkOpen} onOpenChange={setFkOpen}>
+        <DialogContent className="max-w-xl p-0 gap-0 shadow-2xl overflow-hidden flex flex-col bg-[#1c1c1c] border-[#2d2d2d] text-foreground h-[80vh]">
+          <DialogHeader className="p-5 pb-4 border-b border-[#2d2d2d] bg-[#1c1c1c] shrink-0">
+            <DialogTitle className="text-sm font-medium text-foreground/90">
+              Add foreign key relationship to {tableName}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#151515]">
+            <div className="rounded-lg border border-[#2d2d2d] bg-[#1c1c1c] px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-[#252525] transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full border border-muted-foreground/30 text-muted-foreground/60 text-xs font-bold font-serif italic cursor-help">
+                  ?
+                </div>
+                <span className="text-sm font-medium text-foreground/90">What are foreign keys?</span>
+              </div>
+              <Expand size={14} className="text-muted-foreground/50" />
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <Label className="text-xs text-muted-foreground">Select a table to reference to</Label>
+              <Select value={fkTable} onValueChange={setFkTable}>
+                <SelectTrigger className="w-full bg-[#1c1c1c] border-[#2d2d2d] h-10 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Table2 size={14} className="text-muted-foreground/60" />
+                    <SelectValue placeholder="---" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="bg-[#1c1c1c] border-[#2d2d2d]">
+                  {allTables && allTables.map(t => (
+                    <SelectItem key={t.name} value={t.name} className="gap-2">
+                       <span className="text-muted-foreground/50 text-xs">public</span> <span className="font-medium text-foreground">{t.name}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-4 pt-2">
+               <Label className="text-xs text-muted-foreground">
+                 Select columns from <code className="bg-[#2d2d2d] px-1 py-0.5 rounded text-foreground/80">public.{tableName}</code> to reference to
+               </Label>
+               
+               <div className="flex items-center gap-3 w-full">
+                  <div className="flex-1 space-y-1.5">
+                     <p className="text-[10px] text-muted-foreground">public.{tableName}</p>
+                     <Select value={column.name} disabled>
+                       <SelectTrigger className="w-full bg-[#1c1c1c] border-[#2d2d2d] h-9 text-xs">
+                         <SelectValue>{column.name}</SelectValue>
+                       </SelectTrigger>
+                     </Select>
+                  </div>
+                  <ArrowRight size={14} className="text-muted-foreground/60 mt-5 shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                     <p className="text-[10px] text-muted-foreground">{fkTable ? `public.${fkTable}` : "..."}</p>
+                     <Select value={fkColumn} onValueChange={setFkColumn} disabled={!fkTable}>
+                       <SelectTrigger className="w-full bg-[#1c1c1c] border-[#2d2d2d] h-9 text-xs relative">
+                         <SelectValue placeholder="---" />
+                         {fkColumn && <Check size={12} className="absolute right-8 text-emerald-500" />}
+                       </SelectTrigger>
+                       <SelectContent className="bg-[#252525] border-[#333] shadow-lg">
+                         <SelectItem value="id" className="text-xs hover:bg-[#333] cursor-pointer">
+                           <div className="flex items-center justify-between w-full">
+                             <span><span className="font-medium text-foreground">id</span> <span className="text-muted-foreground/60">integer</span></span>
+                           </div>
+                         </SelectItem>
+                         {/* We can just hardcode a common option like ID since we don't fetch the ref table schema here */}
+                       </SelectContent>
+                     </Select>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-9 w-9 mt-5 shrink-0 bg-[#1c1c1c] border border-[#2d2d2d] hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30">
+                     <X size={14} />
+                  </Button>
+               </div>
+               
+               <Button variant="outline" size="sm" className="h-7 text-xs bg-[#1c1c1c] border-[#2d2d2d] text-muted-foreground hover:text-foreground">
+                 Add another column
+               </Button>
+            </div>
+
+            <div className="h-px w-full bg-[#2d2d2d] my-4" />
+
+            <div className="rounded-lg border border-[#2d2d2d] bg-[#1c1c1c] px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-[#252525] transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full border border-muted-foreground/30 text-muted-foreground/60 text-xs font-bold font-serif italic cursor-help">
+                  ?
+                </div>
+                <span className="text-sm font-medium text-foreground/90">Which action is most appropriate?</span>
+              </div>
+              <Expand size={14} className="text-muted-foreground/50" />
+            </div>
+
+            <div className="space-y-6 pt-2">
+              <div className="space-y-2">
+                 <Label className="text-xs text-muted-foreground leading-relaxed">Action if referenced row is updated</Label>
+                 <Select value={fkUpdateAction} onValueChange={setFkUpdateAction}>
+                   <SelectTrigger className="w-full bg-[#1c1c1c] border-[#2d2d2d] h-10 text-sm">
+                     <SelectValue />
+                   </SelectTrigger>
+                   <SelectContent className="bg-[#1c1c1c] border-[#2d2d2d]">
+                     {["No action", "Cascade", "Restrict", "Set NULL", "Set default"].map(a => (
+                       <SelectItem key={a} value={a}>{a}</SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+                 <p className="text-[11px] text-muted-foreground leading-relaxed pt-1">
+                   {fkUpdateAction}: Updating a record from <code className="bg-[#2d2d2d] px-1 rounded text-foreground/80 font-mono">public.{tableName}</code> will <span className="text-amber-500 font-medium">raise an error</span> if there are records existing in this table that reference it
+                 </p>
+              </div>
+
+              <div className="space-y-2">
+                 <div className="flex items-center justify-between">
+                   <Label className="text-xs text-muted-foreground leading-relaxed">Action if referenced row is removed</Label>
+                   <Button variant="outline" size="sm" className="h-6 text-[10px] bg-[#1c1c1c] border-[#2d2d2d] text-foreground/70">
+                     <BookOpen size={10} className="mr-1.5" /> Docs
+                   </Button>
+                 </div>
+                 <Select value={fkDeleteAction} onValueChange={setFkDeleteAction}>
+                   <SelectTrigger className="w-full bg-[#1c1c1c] border-[#2d2d2d] h-10 text-sm">
+                     <SelectValue />
+                   </SelectTrigger>
+                   <SelectContent className="bg-[#1c1c1c] border-[#2d2d2d]">
+                     {["No action", "Cascade", "Restrict", "Set NULL", "Set default"].map(a => (
+                       <SelectItem key={a} value={a}>{a}</SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+                 <p className="text-[11px] text-muted-foreground leading-relaxed pt-1">
+                   {fkDeleteAction}: Deleting a record from <code className="bg-[#2d2d2d] px-1 rounded text-foreground/80 font-mono">public.{tableName}</code> will <span className="text-amber-500 font-medium">raise an error</span> if there are records existing in this table that reference it
+                 </p>
+              </div>
+            </div>
+
+          </div>
+
+          <DialogFooter className="p-4 border-t border-[#2d2d2d] bg-[#1c1c1c] flex justify-end gap-2 shrink-0">
+            <Button variant="ghost" size="sm" onClick={() => setFkOpen(false)} className="text-muted-foreground hover:text-foreground h-8 text-xs font-medium border border-transparent hover:border-[#2d2d2d]">
+              Cancel
+            </Button>
+            <Button size="sm" onClick={() => setFkOpen(false)} className="bg-emerald-600 hover:bg-emerald-500 text-white h-8 text-xs font-medium px-4 border-0">
+              Save <span className="text-emerald-200/50 font-mono ml-1 text-[10px]">⏎</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

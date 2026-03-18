@@ -170,9 +170,10 @@ function DataSkeleton({ colCount }: { colCount: number }) {
 interface DataTabProps {
   databaseId: string;
   table: D1TableSchema;
+  allTables: D1TableSchema[];
 }
 
-function DataTab({ databaseId, table }: DataTabProps) {
+function DataTab({ databaseId, table, allTables }: DataTabProps) {
   const [offset, setOffset] = useState(0);
   const [editingColumn, setEditingColumn] = useState<D1Column | null>(null);
   const { state, refresh } = useD1TableData(databaseId, table.name, offset);
@@ -328,6 +329,7 @@ function DataTab({ databaseId, table }: DataTabProps) {
         onOpenChange={(open) => {
           if (!open) setEditingColumn(null);
         }}
+        allTables={allTables}
       />
 
       {/* Pagination footer */}
@@ -572,7 +574,7 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
             {/* Data — requires a selected table */}
             <TabsContent value="data" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
               {selectedTable
-                ? <DataTab databaseId={database.uuid} table={selectedTable} />
+                ? <DataTab databaseId={database.uuid} table={selectedTable} allTables={tables} />
                 : <PanelMessage icon={Sheet} title="Select a table" body="Click a table name on the left to browse its rows" />}
             </TabsContent>
 

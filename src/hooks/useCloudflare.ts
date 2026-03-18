@@ -296,6 +296,9 @@ const PAGE_LIMIT = 100;
 export interface D1Column {
   name: string;
   type: string;
+  isPrimary?: boolean;
+  isNullable?: boolean;
+  defaultValue?: string | null;
 }
 
 export interface D1TableData {
@@ -353,7 +356,10 @@ export function useD1TableData(
 
       const columns: D1Column[] = pragmaRows.map(r => ({
         name: String(r.name),
-        type: String(r.type || "unknown").toLowerCase()
+        type: String(r.type || "unknown").toLowerCase(),
+        isPrimary: r.pk === 1,
+        isNullable: r.notnull === 0,
+        defaultValue: r.dflt_value != null ? String(r.dflt_value) : null
       }));
 
       // Fallback if PRAGMA fails
