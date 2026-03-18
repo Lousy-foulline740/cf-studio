@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { QueryEditor } from "@/components/QueryEditor";
 import { SchemaVisualizer } from "@/components/SchemaVisualizer";
+import { useAppStore } from "@/store/useAppStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -168,6 +169,9 @@ function DataTab({ databaseId, table }: DataTabProps) {
   const hasNext = state.status === "success" && state.data.totalFetched === 100;
   const hasPrev = offset > 0;
 
+  const tableDensity = useAppStore(s => s.tableDensity);
+  const paddingY = tableDensity === "compact" ? "py-1.5" : "py-2.5";
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Toolbar */}
@@ -223,13 +227,13 @@ function DataTab({ databaseId, table }: DataTabProps) {
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30 sticky top-0 z-10">
                   {/* Row number gutter */}
-                  <TableHead className="w-10 text-center text-[10px] text-muted-foreground/40 font-mono py-2.5 px-2 shrink-0">
+                  <TableHead className={`w-10 text-center text-[10px] text-muted-foreground/40 font-mono px-2 shrink-0 ${paddingY}`}>
                     #
                   </TableHead>
                   {state.data.columns.map((col) => (
                     <TableHead
                       key={col}
-                      className="text-xs font-medium uppercase tracking-wider text-muted-foreground py-2.5 whitespace-nowrap"
+                      className={`text-xs font-medium uppercase tracking-wider text-muted-foreground whitespace-nowrap ${paddingY}`}
                     >
                       {col}
                     </TableHead>
@@ -243,7 +247,7 @@ function DataTab({ databaseId, table }: DataTabProps) {
                     className="hover:bg-accent/30 transition-colors font-mono text-xs"
                   >
                     {/* Row number */}
-                    <TableCell className="text-center text-muted-foreground/30 py-2.5 px-2 select-none tabular-nums">
+                    <TableCell className={`text-center text-muted-foreground/30 px-2 select-none tabular-nums ${paddingY}`}>
                       {state.data.offset + ri + 1}
                     </TableCell>
                     {state.data.columns.map((col) => {
@@ -254,7 +258,7 @@ function DataTab({ databaseId, table }: DataTabProps) {
                         <TableCell
                           key={col}
                           className={cn(
-                            "py-2.5 max-w-[260px] truncate",
+                            `max-w-[260px] truncate ${paddingY}`,
                             isNull && "text-muted-foreground/30 italic",
                             isNum && "text-sky-400 tabular-nums",
                             !isNull && !isNum && "text-foreground"

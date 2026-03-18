@@ -41,8 +41,12 @@ export function isCacheStale(lastFetched: number | null): boolean {
 interface AppState {
   // ── Cached data ──
   userProfile: UserProfile | null;
+  cloudflareAccountId: string | null;
   databases: D1Database[];
   kvNamespaces: KVNamespace[];
+
+  // ── Preferences ──
+  tableDensity: "compact" | "comfortable";
 
   /** Unix timestamp (ms) of the last successful databases fetch, or null. */
   lastFetched: number | null;
@@ -52,6 +56,8 @@ interface AppState {
 
   // ── Actions ──
   setUserProfile: (profile: UserProfile | null) => void;
+  setCloudflareAccountId: (id: string | null) => void;
+  setTableDensity: (density: "compact" | "comfortable") => void;
 
   /** Overwrite the databases list and stamp the fetch time. */
   setDatabases: (databases: D1Database[]) => void;
@@ -73,13 +79,17 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       // ── Initial state ──
       userProfile: null,
+      cloudflareAccountId: null,
       databases: [],
       kvNamespaces: [],
+      tableDensity: "comfortable",
       lastFetched: null,
       kvLastFetched: null,
 
       // ── Actions ──
       setUserProfile: (profile) => set({ userProfile: profile }),
+      setCloudflareAccountId: (id) => set({ cloudflareAccountId: id }),
+      setTableDensity: (density) => set({ tableDensity: density }),
       setDatabases: (databases) =>
         set({ databases, lastFetched: Date.now() }),
 
@@ -89,6 +99,7 @@ export const useAppStore = create<AppState>()(
       clearCache: () =>
         set({
           userProfile: null,
+          cloudflareAccountId: null,
           databases: [],
           kvNamespaces: [],
           lastFetched: null,
@@ -101,6 +112,8 @@ export const useAppStore = create<AppState>()(
       // Only persist the data fields — actions are not serialisable.
       partialize: (state) => ({
         userProfile: state.userProfile,
+        cloudflareAccountId: state.cloudflareAccountId,
+        tableDensity: state.tableDensity,
         databases: state.databases,
         kvNamespaces: state.kvNamespaces,
         lastFetched: state.lastFetched,

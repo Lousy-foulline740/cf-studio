@@ -39,6 +39,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             get_cloudflare_token,
+            cloudflare_auth::refresh_wrangler_token,
             d1::fetch_d1_databases,
             d1::execute_d1_query,
             user::fetch_user_profile,

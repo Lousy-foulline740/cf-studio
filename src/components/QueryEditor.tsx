@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { type D1QueryResult } from "@/hooks/useCloudflare";
+import { useAppStore } from "@/store/useAppStore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,9 @@ function ResultTable({
   const hasPrev = offset > 0;
   const hasNext = offset + PAGE < rows.length;
 
+  const tableDensity = useAppStore(s => s.tableDensity);
+  const paddingY = tableDensity === "compact" ? "py-1" : "py-2";
+
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-1 overflow-auto">
@@ -64,9 +68,9 @@ function ResultTable({
         <Table>
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30">
-                <TableHead className="w-10 text-center text-[10px] text-muted-foreground/40 font-mono py-2 px-2">#</TableHead>
+                <TableHead className={`w-10 text-center text-[10px] text-muted-foreground/40 font-mono px-2 ${paddingY}`}>#</TableHead>
                 {columns.map((col) => (
-                  <TableHead key={col} className="text-xs font-medium uppercase tracking-wider text-muted-foreground py-2 whitespace-nowrap">
+                  <TableHead key={col} className={`text-xs font-medium uppercase tracking-wider text-muted-foreground whitespace-nowrap ${paddingY}`}>
                     {col}
                   </TableHead>
                 ))}
@@ -75,7 +79,7 @@ function ResultTable({
             <TableBody>
               {page.map((row, ri) => (
                 <TableRow key={ri} className="hover:bg-accent/30 font-mono text-xs transition-colors">
-                  <TableCell className="text-center text-muted-foreground/30 py-2 px-2 select-none tabular-nums">
+                  <TableCell className={`text-center text-muted-foreground/30 px-2 select-none tabular-nums ${paddingY}`}>
                     {offset + ri + 1}
                   </TableCell>
                   {columns.map((col) => {
@@ -85,7 +89,7 @@ function ResultTable({
                     return (
                       <TableCell
                         key={col}
-                        className={cn("py-2 max-w-[240px] truncate",
+                        className={cn(`max-w-[240px] truncate ${paddingY}`,
                           isNull && "text-muted-foreground/30 italic",
                           isNum && "text-sky-400 tabular-nums",
                           !isNull && !isNum && "text-foreground"

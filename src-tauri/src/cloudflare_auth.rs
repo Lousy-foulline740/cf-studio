@@ -26,6 +26,9 @@ pub enum AuthError {
 
     #[error("No oauth_token found in Wrangler config. Run `wrangler login` first.")]
     NoToken,
+
+    #[error("Command execution failed: {0}")]
+    ExecError(String),
 }
 
 // Tauri requires errors to be serializable so they travel back to JS as strings.
@@ -133,6 +136,42 @@ pub fn read_credentials() -> Result<CloudflareCredentials, AuthError> {
         oauth_token,
         account_id: config.account_id,
     })
+}
+
+// ── Background Token Refresh ───────────────────────────────────────────────────
+
+/// Executes `wrangler whoami` silently in the background. Wrangler automatically
+/// detects expired tokens and refreshes them during this command. We then
+/// re-read the configuration file and return the fresh token.
+#[tauri::command]
+pub async fn refresh_wrangler_token() -> Result<CloudflareCredentials, AuthError> {
+    let output = tokio::task::spawn_blocking(|| {
+        let mut cmd = if cfg!(target_os = "windows") {
+            let mut c = std::process::Command::new("cmd");
+            c.args(["/c", "wrangler", "whoami"]);
+            c
+        } else {
+            let mut c = std::process::Command::new("wrangler");
+            c.arg("whoami");
+            c
+        };
+
+        // Run silently
+        cmd.output()
+    })
+    .await
+    .map_err(|e| AuthError::ExecError(e.to_string()))?
+    .map_err(AuthError::Io)?;
+
+    if !output.status.success() {
+        let err_msg = String::from_utf8_lossy(&output.stderr);
+        return Err(AuthError::ExecError(format!("Wrangler failed to refresh token: {}", err_msg)));
+    }
+
+    // Re-read the credentials now that Wrangler has updated the config file
+    tokio::task::spawn_blocking(read_credentials)
+        .await
+        .map_err(|e| AuthError::ExecError(e.to_string()))?
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────────

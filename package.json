@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource/google-sans-code": "^5.2.3",
     "@fontsource/google-sans-flex": "^5.2.2",
+    "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-scroll-area": "^1.2.10",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
