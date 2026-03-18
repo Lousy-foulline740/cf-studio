@@ -26,7 +26,7 @@ import {
   // We need UserProfile type from store
   type UserProfile,
 } from "@/store/useAppStore";
-import { invokeCloudflare } from "@/hooks/useCloudflare";
+import { invokeCloudflare, useCloudflareAccounts } from "@/hooks/useCloudflare";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface NavGroup {
@@ -78,9 +78,10 @@ interface SidebarProps {
   activeId: string;
   onNavigate: (id: string) => void;
   userProfile: UserProfile | null;
+  activeAccount: { id: string; name: string } | null;
 }
 
-function Sidebar({ collapsed, activeId, onNavigate, userProfile }: SidebarProps) {
+function Sidebar({ collapsed, activeId, onNavigate, userProfile, activeAccount }: SidebarProps) {
   const { theme, setTheme } = useTheme();
 
   return (
@@ -161,39 +162,21 @@ function Sidebar({ collapsed, activeId, onNavigate, userProfile }: SidebarProps)
       </nav>
 
       {/* User Profile */}
-      {!collapsed && userProfile && (() => {
-        let displayName = userProfile.first_name && userProfile.last_name 
-          ? `${userProfile.first_name} ${userProfile.last_name}`
-          : userProfile.first_name || "Cloudflare User";
-
-        if (displayName === "Cloudflare User" || !displayName.trim()) {
-          const fallback = userProfile.email.split('@')[0];
-          displayName = fallback.charAt(0).toUpperCase() + fallback.slice(1);
-        }
-
-        const initials = displayName
-          .split(/[\s_-]+/)
-          .map(n => n[0])
-          .join('')
-          .substring(0, 2)
-          .toUpperCase();
-
-        return (
-          <div className="px-3 py-3 border-t border-sidebar-border shrink-0 flex items-center gap-2.5 bg-sidebar-accent/10">
-            <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs shrink-0 uppercase tracking-tight">
-              {initials}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-sm font-medium text-sidebar-foreground leading-tight truncate">
-                {displayName}
-              </span>
-              <span className="text-[10px] text-sidebar-foreground/50 leading-tight truncate">
-                {userProfile.email}
-              </span>
-            </div>
+      {!collapsed && activeAccount && (
+        <div className="px-3 py-3 border-t border-sidebar-border shrink-0 flex items-center gap-2.5 bg-sidebar-accent/10">
+          <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs shrink-0 uppercase tracking-tight">
+            {(activeAccount.name.trim().charAt(0) || "?").toUpperCase()}
           </div>
-        );
-      })()}
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-medium text-sidebar-foreground leading-tight truncate">
+              {activeAccount.name}
+            </span>
+            <span className="text-[10px] text-sidebar-foreground/50 leading-tight truncate">
+              {userProfile?.email ?? ""}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Theme Switcher */}
       {!collapsed && (
@@ -304,6 +287,9 @@ export function Layout() {
   const [activeId, setActiveId] = useState("d1");
   const userProfile = useAppStore(s => s.userProfile);
   const setUserProfile = useAppStore(s => s.setUserProfile);
+  const activeAccount = useAppStore(s => s.activeAccount);
+
+  useCloudflareAccounts();
 
   // Fetch User Profile on mount
   useEffect(() => {
@@ -327,6 +313,7 @@ export function Layout() {
           activeId={activeId}
           onNavigate={setActiveId}
           userProfile={userProfile}
+          activeAccount={activeAccount}
         />
 
         {/* Main column */}

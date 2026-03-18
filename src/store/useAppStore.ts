@@ -9,7 +9,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { D1Database } from "@/hooks/useCloudflare";
+import type { D1Database, CloudflareAccount } from "@/hooks/useCloudflare";
 
 export interface UserProfile {
   id: string;
@@ -42,6 +42,8 @@ interface AppState {
   // ── Cached data ──
   userProfile: UserProfile | null;
   cloudflareAccountId: string | null;
+  accounts: CloudflareAccount[];
+  activeAccount: CloudflareAccount | null;
   databases: D1Database[];
   kvNamespaces: KVNamespace[];
 
@@ -58,6 +60,8 @@ interface AppState {
   // ── Actions ──
   setUserProfile: (profile: UserProfile | null) => void;
   setCloudflareAccountId: (id: string | null) => void;
+  setAccounts: (accounts: CloudflareAccount[]) => void;
+  setActiveAccount: (account: CloudflareAccount | null) => void;
   setTableDensity: (density: "compact" | "comfortable") => void;
   setIsRefreshingSession: (isRefreshing: boolean) => void;
 
@@ -82,6 +86,8 @@ export const useAppStore = create<AppState>()(
       // ── Initial state ──
       userProfile: null,
       cloudflareAccountId: null,
+      accounts: [],
+      activeAccount: null,
       databases: [],
       kvNamespaces: [],
       tableDensity: "comfortable",
@@ -92,6 +98,8 @@ export const useAppStore = create<AppState>()(
       // ── Actions ──
       setUserProfile: (profile) => set({ userProfile: profile }),
       setCloudflareAccountId: (id) => set({ cloudflareAccountId: id }),
+      setAccounts: (accounts) => set({ accounts }),
+      setActiveAccount: (account) => set({ activeAccount: account }),
       setTableDensity: (density) => set({ tableDensity: density }),
       setIsRefreshingSession: (b) => set({ isRefreshingSession: b }),
       setDatabases: (databases) =>
@@ -104,6 +112,8 @@ export const useAppStore = create<AppState>()(
         set({
           userProfile: null,
           cloudflareAccountId: null,
+          accounts: [],
+          activeAccount: null,
           databases: [],
           kvNamespaces: [],
           lastFetched: null,
@@ -117,6 +127,8 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         userProfile: state.userProfile,
         cloudflareAccountId: state.cloudflareAccountId,
+        accounts: state.accounts,
+        activeAccount: state.activeAccount,
         tableDensity: state.tableDensity,
         databases: state.databases,
         kvNamespaces: state.kvNamespaces,

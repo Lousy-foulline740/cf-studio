@@ -64,6 +64,11 @@ export interface CloudflareCredentials {
   account_id?: string;
 }
 
+export interface CloudflareAccount {
+  id: string;
+  name: string;
+}
+
 export interface D1Database {
   uuid: string;
   name: string;
@@ -124,6 +129,31 @@ export function useCloudflareAuth() {
   }, [fetch]);
 
   return { state, refresh: fetch };
+}
+
+// ── Accounts hook ──────────────────────────────────────────────────────────────
+
+export function useCloudflareAccounts() {
+  const accounts = useAppStore((s) => s.accounts);
+  const activeAccount = useAppStore((s) => s.activeAccount);
+  const setAccounts = useAppStore((s) => s.setAccounts);
+  const setActiveAccount = useAppStore((s) => s.setActiveAccount);
+
+  useEffect(() => {
+    if (accounts.length > 0) {
+      if (!activeAccount) {
+        setActiveAccount(accounts[0]);
+      }
+      return;
+    }
+
+    invokeCloudflare<CloudflareAccount[]>("fetch_cloudflare_accounts")
+      .then((list) => {
+        setAccounts(list);
+        setActiveAccount(list[0] ?? null);
+      })
+      .catch(console.error);
+  }, [accounts.length, activeAccount, setAccounts, setActiveAccount]);
 }
 
 // ── D1 Databases hook ──────────────────────────────────────────────────────────
