@@ -11,7 +11,6 @@ import {
   Moon,
   Monitor,
   CloudCog,
-  RefreshCw,
   Box,
   Activity,
   ScrollText,
@@ -20,12 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { Badge } from "@/components/ui/badge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { SessionRefreshModal } from "@/components/SessionRefreshModal";
 import {
   useAppStore,
@@ -237,11 +231,9 @@ interface TitleBarProps {
   collapsed: boolean;
   onToggle: () => void;
   title: string;
-  isRefreshing: boolean;
-  onRefresh: () => void;
 }
 
-function TitleBar({ collapsed, onToggle, title, isRefreshing, onRefresh }: TitleBarProps) {
+function TitleBar({ collapsed, onToggle, title }: TitleBarProps) {
   return (
     <header
       // Tauri: makes the entire bar draggable to move the window
@@ -349,7 +341,7 @@ export function Layout() {
   }, [activeId, isRefreshing, setDatabases]);
 
   return (
-    <TooltipProvider delayDuration={400}>
+    <>
       <SessionRefreshModal />
       <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
         {/* Sidebar */}
@@ -367,8 +359,6 @@ export function Layout() {
             collapsed={collapsed}
             onToggle={() => setCollapsed((c) => !c)}
             title={pageTitle}
-            isRefreshing={isRefreshing}
-            onRefresh={handleGlobalRefresh}
           />
 
           {/* Content area */}
@@ -377,6 +367,6 @@ export function Layout() {
           </main>
         </div>
       </div>
-    </TooltipProvider>
+    </>
   );
 }
