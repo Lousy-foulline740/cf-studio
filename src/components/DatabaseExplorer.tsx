@@ -656,6 +656,14 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
               {database.version}
             </Badge>
           )}
+          <Badge 
+            variant="outline" 
+            className="gap-1.5 ml-1.5 px-2 cursor-pointer hover:bg-muted font-medium text-[10px] uppercase tracking-wider shrink-0 transition-colors"
+            onClick={() => setIsVisualSchemaOpen(true)}
+          >
+            <Network size={11} strokeWidth={2.5} />
+            Visual Schema
+          </Badge>
         </div>
 
         <Button
@@ -673,26 +681,9 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
         {/* Left: table list */}
         <div className="w-[200px] shrink-0 border-r border-border flex flex-col bg-muted/20">
           <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
-                Tables
-              </span>
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button 
-                      onClick={() => setIsVisualSchemaOpen(true)}
-                      className="hover:bg-muted/60 p-1 -m-1 rounded transition-colors text-muted-foreground hover:text-foreground"
-                    >
-                      <Network size={12} strokeWidth={2} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs font-medium">
-                    Visual Schema
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
+            <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
+              Tables
+            </span>
             {state.status === "success" && (
               <span className="text-[10px] text-muted-foreground/40">{userTables.length}</span>
             )}
