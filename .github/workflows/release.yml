@@ -1,0 +1,200 @@
+name: Release macOS Build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # ──────────────────────────────────────────────
+  # 1. Determine next version, update files, tag
+  # ──────────────────────────────────────────────
+  version:
+    if: endsWith(github.event.head_commit.message, '--release')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new_version: ${{ steps.bump.outputs.new_version }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine next semantic version
+        id: bump
+        run: |
+          # Get the latest version tag (e.g. v1.0.9), default to v0.0.0
+          LATEST_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
+
+          if [ -z "$LATEST_TAG" ]; then
+            # No tags yet — start at v1.0.0
+            NEW_VERSION="1.0.0"
+          else
+            # Strip leading 'v'
+            VERSION="${LATEST_TAG#v}"
+            MAJOR=$(echo "$VERSION" | cut -d. -f1)
+            MINOR=$(echo "$VERSION" | cut -d. -f2)
+            PATCH=$(echo "$VERSION" | cut -d. -f3)
+
+            if [ "$PATCH" -ge 9 ]; then
+              # Bump minor, reset patch
+              MINOR=$((MINOR + 1))
+              PATCH=0
+            else
+              # Bump patch
+              PATCH=$((PATCH + 1))
+            fi
+
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "🏷️  Next version: v$NEW_VERSION"
+
+      - name: Update version in package.json
+        run: |
+          jq --arg v "${{ steps.bump.outputs.new_version }}" \
+            '.version = $v' package.json > package.tmp.json \
+            && mv package.tmp.json package.json
+
+      - name: Update version in tauri.conf.json
+        run: |
+          jq --arg v "${{ steps.bump.outputs.new_version }}" \
+            '.version = $v' src-tauri/tauri.conf.json > tauri.tmp.json \
+            && mv tauri.tmp.json src-tauri/tauri.conf.json
+
+      - name: Update version in Cargo.toml
+        run: |
+          sed -i "s/^version = \".*\"/version = \"${{ steps.bump.outputs.new_version }}\"/" src-tauri/Cargo.toml
+
+      - name: Commit version bump & create tag
+        run: |
+          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
+          git commit -m "chore: bump version to v${{ steps.bump.outputs.new_version }}"
+          git tag "v${{ steps.bump.outputs.new_version }}"
+          git push origin main --tags
+
+  # ──────────────────────────────────────────────
+  # 2. Build for macOS (Apple Silicon + Intel)
+  # ──────────────────────────────────────────────
+  build:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+            rust_target: aarch64-apple-darwin
+            dmg_suffix: arm64
+          - runner: macos-13
+            arch: x86_64
+            rust_target: x86_64-apple-darwin
+            dmg_suffix: x86_64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version.outputs.new_version }}
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build Tauri app (.dmg)
+        run: bun run tauri build --target ${{ matrix.rust_target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Rename .dmg with architecture suffix
+        id: dmg
+        run: |
+          DMG_DIR="src-tauri/target/${{ matrix.rust_target }}/release/bundle/dmg"
+          DMG_FILE=$(ls "$DMG_DIR"/*.dmg 2>/dev/null | head -n1)
+
+          if [ -z "$DMG_FILE" ]; then
+            echo "::error::No .dmg found in $DMG_DIR"
+            exit 1
+          fi
+
+          BASENAME=$(basename "$DMG_FILE" .dmg)
+          FINAL_NAME="${BASENAME}-${{ matrix.dmg_suffix }}.dmg"
+          mv "$DMG_FILE" "$DMG_DIR/$FINAL_NAME"
+
+          echo "dmg_path=$DMG_DIR/$FINAL_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload .dmg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cf-studio-${{ matrix.dmg_suffix }}
+          path: ${{ steps.dmg.outputs.dmg_path }}
+          if-no-files-found: error
+
+  # ──────────────────────────────────────────────
+  # 3. Create GitHub Release with versioned tag
+  # ──────────────────────────────────────────────
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download arm64 .dmg
+        uses: actions/download-artifact@v4
+        with:
+          name: cf-studio-arm64
+          path: ./artifacts
+
+      - name: Download x86_64 .dmg
+        uses: actions/download-artifact@v4
+        with:
+          name: cf-studio-x86_64
+          path: ./artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ needs.version.outputs.new_version }}"
+          name: "CF Studio v${{ needs.version.outputs.new_version }}"
+          body: |
+            ## CF Studio v${{ needs.version.outputs.new_version }}
+
+            ### Downloads
+            | Platform | Architecture | File |
+            |----------|--------------|------|
+            | macOS | Apple Silicon (M1/M2/M3/M4) | `CF-Studio-*-arm64.dmg` |
+            | macOS | Intel | `CF-Studio-*-x86_64.dmg` |
+
+            *Note: As this is an ad-hoc signed app, you may need to right-click the app and select "Open" on first launch, or run `xattr -cr /Applications/CF\ Studio.app` in your terminal to bypass Gatekeeper.*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: ./artifacts/*.dmg
