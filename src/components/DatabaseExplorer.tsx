@@ -608,6 +608,7 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
   const [selectedTable, setSelectedTable] = useState<D1TableSchema | null>(null);
   const [systemOpen, setSystemOpen] = useState(false);
   const [isVisualSchemaOpen, setIsVisualSchemaOpen] = useState(false);
+  const [isQueryEditorOpen, setIsQueryEditorOpen] = useState(false);
   const userPickedRef = useRef(false);          // true once user manually clicks a table
   const { state, refresh } = useD1Schema(database.uuid);
 
@@ -656,6 +657,14 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
               {database.version}
             </Badge>
           )}
+          <Badge 
+            variant="outline" 
+            className="gap-1.5 ml-1.5 px-2 cursor-pointer hover:bg-muted font-medium text-[10px] uppercase tracking-wider shrink-0 transition-colors"
+            onClick={() => setIsQueryEditorOpen(true)}
+          >
+            <Terminal size={11} strokeWidth={2.5} />
+            SQL Editor
+          </Badge>
           <Badge 
             variant="outline" 
             className="gap-1.5 ml-1.5 px-2 cursor-pointer hover:bg-muted font-medium text-[10px] uppercase tracking-wider shrink-0 transition-colors"
@@ -751,7 +760,6 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
             <div className="border-b border-border px-3 pt-2 pb-0 shrink-0 bg-muted/10">
               <TabsList className="h-8 bg-transparent p-0 gap-0">
                 {([
-                  { value: "sql",    Icon: Terminal, label: "SQL Editor"   },
                   { value: "data",   Icon: Sheet,    label: "Data"         },
                   { value: "schema", Icon: Code2,    label: "Schema"       },
                 ] as const).map(({ value, Icon, label }) => (
@@ -771,11 +779,6 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
                 ))}
               </TabsList>
             </div>
-
-            {/* SQL Editor — always available */}
-            <TabsContent value="sql" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
-              <QueryEditor databaseId={database.uuid} />
-            </TabsContent>
 
             {/* Data — requires a selected table */}
             <TabsContent value="data" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
@@ -811,6 +814,19 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
           </div>
           <div className="flex-1 min-h-0 relative">
             <SchemaVisualizer tables={tables} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isQueryEditorOpen} onOpenChange={setIsQueryEditorOpen}>
+        <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 overflow-hidden flex flex-col gap-0 border-border bg-background shadow-2xl">
+          <DialogTitle className="sr-only">SQL Editor</DialogTitle>
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/10 shrink-0">
+            <Terminal size={16} className="text-primary" />
+            <span className="font-semibold text-sm">SQL Editor — {database.name}</span>
+          </div>
+          <div className="flex-1 min-h-0 relative flex flex-col">
+            <QueryEditor databaseId={database.uuid} tables={allTables} />
           </div>
         </DialogContent>
       </Dialog>

@@ -4,7 +4,7 @@
 // Runs arbitrary SQL via the `execute_d1_query` Tauri command and renders
 // results as a dynamic table, mutation summary, or error alert.
 
-import { useState, useRef, useCallback, type KeyboardEvent } from "react";
+import { useState, useRef, useCallback, useMemo, type KeyboardEvent } from "react";
 import {
   Play, Loader2, AlertCircle, CheckCircle2,
   RotateCcw, Sparkles, ChevronLeft, ChevronRight,
@@ -18,7 +18,7 @@ import {
   TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { type D1QueryResult, invokeCloudflare } from "@/hooks/useCloudflare";
+import { type D1QueryResult, invokeCloudflare, type D1TableSchema } from "@/hooks/useCloudflare";
 import { useAppStore } from "@/store/useAppStore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -31,14 +31,29 @@ type QueryStatus =
   | { kind: "ddl"; duration?: number }
   | { kind: "error"; message: string };
 
-// ── Starter templates ─────────────────────────────────────────────────────────
-
-const TEMPLATES = [
-  { label: "SELECT *",   sql: "SELECT * FROM your_table LIMIT 50;" },
-  { label: "COUNT",      sql: 'SELECT COUNT(*) AS total FROM your_table;' },
-  { label: "INSERT",     sql: 'INSERT INTO your_table (col1, col2) VALUES (\'value1\', \'value2\');' },
-  { label: "PRAGMA",     sql: "PRAGMA table_list;" },
-];
+function getColumnsFromSql(sql: string | null): [string, string] {
+  if (!sql) return ["col1", "col2"];
+  // SQLite CREATE TABLE schema usually contains body inside parenthesis
+  const bodyMatch = sql.match(/\(([\s\S]+)\)/);
+  if (!bodyMatch) return ["col1", "col2"];
+  
+  // split lines by comma, but naive to nested commas (good enough for 2 column names)
+  const lines = bodyMatch[1].split(",").map(s => s.trim()).filter(s => s.length > 0);
+  
+  const cols: string[] = [];
+  for (const line of lines) {
+    // skip common table constraints
+    if (line.toUpperCase().startsWith("PRIMARY KEY") || line.toUpperCase().startsWith("FOREIGN KEY") || line.toUpperCase().startsWith("UNIQUE")) {
+      continue;
+    }
+    const nameMatch = line.match(/^[`"']?(\w+)[`"']?/);
+    if (nameMatch && nameMatch[1]) {
+      cols.push(nameMatch[1]);
+    }
+    if (cols.length >= 2) break;
+  }
+  return [cols[0] || "col1", cols[1] || cols[0] || "col2"];
+}
 
 // ── Result data table (shared display component) ───────────────────────────────
 
@@ -130,12 +145,30 @@ function ResultTable({
 
 interface QueryEditorProps {
   databaseId: string;
+  tables?: D1TableSchema[];
 }
 
-export function QueryEditor({ databaseId }: QueryEditorProps) {
-  const [sql, setSql] = useState("SELECT * FROM sqlite_master WHERE type='table';");
+export function QueryEditor({ databaseId, tables }: QueryEditorProps) {
+  const dynamicTemplateData = useMemo(() => {
+    if (!tables || tables.length === 0) return { table: "your_table", col1: "col1", col2: "col2" };
+    // Prefer user tables over system tables
+    const userTables = tables.filter(t => !t.name.startsWith("_cf_") && !t.name.startsWith("sqlite_"));
+    const list = userTables.length > 0 ? userTables : tables;
+    const randomTable = list[Math.floor(Math.random() * list.length)];
+    const [c1, c2] = getColumnsFromSql(randomTable.sql);
+    return { table: randomTable.name, col1: c1, col2: c2 };
+  }, [tables]);
+
+  const [sql, setSql] = useState(`SELECT * FROM ${dynamicTemplateData.table} LIMIT 50;`);
   const [status, setStatus] = useState<QueryStatus>({ kind: "idle" });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const templates = useMemo(() => [
+    { label: "SELECT *",   sql: `SELECT * FROM ${dynamicTemplateData.table} LIMIT 50;` },
+    { label: "COUNT",      sql: `SELECT COUNT(*) AS total FROM ${dynamicTemplateData.table};` },
+    { label: "INSERT",     sql: `INSERT INTO ${dynamicTemplateData.table} (${dynamicTemplateData.col1}, ${dynamicTemplateData.col2}) VALUES ('value1', 'value2');` },
+    { label: "PRAGMA",     sql: "PRAGMA table_list;" },
+  ], [dynamicTemplateData]);
 
   const runQuery = useCallback(async () => {
     const query = sql.trim();
@@ -206,7 +239,7 @@ export function QueryEditor({ databaseId }: QueryEditorProps) {
           {/* Template buttons */}
           <div className="flex items-center gap-1 flex-1 min-w-0 flex-wrap">
             <Sparkles size={11} strokeWidth={1.75} className="text-muted-foreground/40 shrink-0" />
-            {TEMPLATES.map((t) => (
+            {templates.map((t: { label: string; sql: string }) => (
               <button
                 key={t.label}
                 onClick={() => setSql(t.sql)}
@@ -252,7 +285,7 @@ export function QueryEditor({ databaseId }: QueryEditorProps) {
           onChange={(e) => setSql(e.target.value)}
           onKeyDown={handleKeyDown}
           spellCheck={false}
-          placeholder="SELECT * FROM your_table LIMIT 50;"
+          placeholder={`SELECT * FROM ${dynamicTemplateData.table} LIMIT 50;`}
           className={cn(
             "w-full resize-none font-mono text-sm leading-6 p-4 min-h-[120px] max-h-[240px]",
             "bg-muted/10 text-foreground placeholder:text-muted-foreground/30",
