@@ -6,9 +6,6 @@ on:
       - main
 
 jobs:
-  # ──────────────────────────────────────────────
-  # 1. Determine next version, update files, tag
-  # ──────────────────────────────────────────────
   version:
     if: endsWith(github.event.head_commit.message, '--release')
     runs-on: ubuntu-latest
@@ -82,9 +79,7 @@ jobs:
           git tag "v${{ steps.bump.outputs.new_version }}"
           git push origin main --tags
 
-  # ──────────────────────────────────────────────
-  # 2. Build for macOS (Apple Silicon + Intel)
-  # ──────────────────────────────────────────────
+
   build:
     needs: version
     strategy:
@@ -94,11 +89,11 @@ jobs:
           - runner: macos-14
             arch: arm64
             rust_target: aarch64-apple-darwin
-            dmg_suffix: arm64
-          - runner: macos-13
+            dmg_suffix: apple_silicon
+          - runner: macos-14
             arch: x86_64
             rust_target: x86_64-apple-darwin
-            dmg_suffix: x86_64
+            dmg_suffix: intel_chip
 
     runs-on: ${{ matrix.runner }}
 
@@ -112,6 +107,12 @@ jobs:
         with:
           targets: ${{ matrix.rust_target }}
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.rust_target }}
+
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -121,6 +122,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Cache frontend dependencies
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: bun-${{ hashFiles('bun.lockb') }}
+          restore-keys: bun-
 
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile
@@ -155,9 +163,6 @@ jobs:
           path: ${{ steps.dmg.outputs.dmg_path }}
           if-no-files-found: error
 
-  # ──────────────────────────────────────────────
-  # 3. Create GitHub Release with versioned tag
-  # ──────────────────────────────────────────────
   release:
     needs: [version, build]
     runs-on: ubuntu-latest
@@ -167,16 +172,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download arm64 .dmg
+      - name: Download Apple Silicon .dmg
         uses: actions/download-artifact@v4
         with:
-          name: cf-studio-arm64
+          name: cf-studio-apple_silicon
           path: ./artifacts
 
-      - name: Download x86_64 .dmg
+      - name: Download Intel .dmg
         uses: actions/download-artifact@v4
         with:
-          name: cf-studio-x86_64
+          name: cf-studio-intel_chip
           path: ./artifacts
 
       - name: Create GitHub Release
@@ -190,8 +195,8 @@ jobs:
             ### Downloads
             | Platform | Architecture | File |
             |----------|--------------|------|
-            | macOS | Apple Silicon (M1/M2/M3/M4) | `CF-Studio-*-arm64.dmg` |
-            | macOS | Intel | `CF-Studio-*-x86_64.dmg` |
+            | macOS | Apple Silicon (M1/M2/M3/M4) | `CF-Studio-*-apple_silicon.dmg` |
+            | macOS | Intel | `CF-Studio-*-intel_chip.dmg` |
 
             *Note: As this is an ad-hoc signed app, you may need to right-click the app and select "Open" on first launch, or run `xattr -cr /Applications/CF\ Studio.app` in your terminal to bypass Gatekeeper.*
           draft: false
