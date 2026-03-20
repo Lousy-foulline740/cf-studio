@@ -1,6 +1,6 @@
 [package]
 name = "cf-studio"
-version = "1.0.2"
+version = "0.0.1"
 description = "A blazing-fast native desktop client for Cloudflare D1 and KV"
 authors = ["CF Studio"]
 edition = "2021"
@@ -46,3 +46,9 @@ dirs = "5"
 
 # Async runtime
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
+
+# AWS S3 SDK — used for Cloudflare R2 (S3-compatible) operations
+aws-sdk-s3 = { version = "1", features = ["behavior-version-latest"] }
+aws-config = { version = "1", features = ["behavior-version-latest"] }
+aws-credential-types = "1"
+aws-smithy-runtime-api = "1"
