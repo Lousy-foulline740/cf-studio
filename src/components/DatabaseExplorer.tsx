@@ -43,6 +43,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import {
   useD1Schema,
@@ -606,6 +607,7 @@ interface DatabaseExplorerProps {
 export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
   const [selectedTable, setSelectedTable] = useState<D1TableSchema | null>(null);
   const [systemOpen, setSystemOpen] = useState(false);
+  const [isVisualSchemaOpen, setIsVisualSchemaOpen] = useState(false);
   const userPickedRef = useRef(false);          // true once user manually clicks a table
   const { state, refresh } = useD1Schema(database.uuid);
 
@@ -671,9 +673,26 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
         {/* Left: table list */}
         <div className="w-[200px] shrink-0 border-r border-border flex flex-col bg-muted/20">
           <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0">
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
-              Tables
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50 font-medium">
+                Tables
+              </span>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button 
+                      onClick={() => setIsVisualSchemaOpen(true)}
+                      className="hover:bg-muted/60 p-1 -m-1 rounded transition-colors text-muted-foreground hover:text-foreground"
+                    >
+                      <Network size={12} strokeWidth={2} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs font-medium">
+                    Visual Schema
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             {state.status === "success" && (
               <span className="text-[10px] text-muted-foreground/40">{userTables.length}</span>
             )}
@@ -744,7 +763,6 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
                   { value: "sql",    Icon: Terminal, label: "SQL Editor"   },
                   { value: "data",   Icon: Sheet,    label: "Data"         },
                   { value: "schema", Icon: Code2,    label: "Schema"       },
-                  { value: "visual", Icon: Network,  label: "Visual Schema" },
                 ] as const).map(({ value, Icon, label }) => (
                   <TabsTrigger
                     key={value}
@@ -789,14 +807,22 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
                 ? <SchemaTab table={selectedTable} />
                 : <PanelMessage icon={BookOpen} title="Select a table" body="Click a table name on the left to view its CREATE TABLE statement" />}
             </TabsContent>
-
-            {/* Visual Schema — always available, shows entire DB graph */}
-            <TabsContent value="visual" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
-              <SchemaVisualizer tables={tables} />
-            </TabsContent>
           </Tabs>
         </div>
       </div>
+
+      <Dialog open={isVisualSchemaOpen} onOpenChange={setIsVisualSchemaOpen}>
+        <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 overflow-hidden flex flex-col gap-0 border-border bg-background shadow-2xl">
+          <DialogTitle className="sr-only">Visual Schema</DialogTitle>
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/10 shrink-0">
+            <Network size={16} className="text-primary" />
+            <span className="font-semibold text-sm">Visual Schema — {database.name}</span>
+          </div>
+          <div className="flex-1 min-h-0 relative">
+            <SchemaVisualizer tables={tables} />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
