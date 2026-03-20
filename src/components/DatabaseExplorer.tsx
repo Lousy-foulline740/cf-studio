@@ -179,9 +179,10 @@ interface DataTabProps {
   databaseId: string;
   table: D1TableSchema;
   allTables: D1TableSchema[];
+  onTableSelect?: (tableName: string) => void;
 }
 
-function DataTab({ databaseId, table, allTables }: DataTabProps) {
+function DataTab({ databaseId, table, allTables, onTableSelect }: DataTabProps) {
   const [offset, setOffset] = useState(0);
   const [editingColumn, setEditingColumn] = useState<D1Column | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -189,6 +190,34 @@ function DataTab({ databaseId, table, allTables }: DataTabProps) {
   const [sortCol, setSortCol] = useState<string | undefined>();
   const [sortAsc, setSortAsc] = useState<boolean | undefined>();
   const { state, refresh } = useD1TableData(databaseId, table.name, offset, sortCol, sortAsc);
+
+  const [incomingFks, setIncomingFks] = useState<{fromTable: string, fromColumn: string, toColumn: string}[]>([]);
+
+  useEffect(() => {
+    const incoming: {fromTable: string, fromColumn: string, toColumn: string}[] = [];
+    allTables.forEach(t => {
+      if (t.name === table.name || !t.sql) return;
+      
+      const fkRegex = /FOREIGN\s+KEY\s*\([`"']?(\w+)[`"']?\)\s*REFERENCES\s*[`"']?(\w+)[`"']?\s*\([`"']?(\w+)[`"']?\)/gi;
+      let match: RegExpExecArray | null;
+      while ((match = fkRegex.exec(t.sql)) !== null) {
+        if (match[2] === table.name) {
+          incoming.push({ fromTable: t.name, fromColumn: match[1], toColumn: match[3] });
+        }
+      }
+
+      const inlineRegex = /[`"']?(\w+)[`"']?\s+(?:[A-Z0-9_]+\s+)*REFERENCES\s*[`"']?(\w+)[`"']?\s*\([`"']?(\w+)[`"']?\)/gi;
+      while ((match = inlineRegex.exec(t.sql)) !== null) {
+        if (match[2] === table.name) {
+          const fromCol = match[1];
+          if (!incoming.some(i => i.fromTable === t.name && i.fromColumn === fromCol)) {
+             incoming.push({ fromTable: t.name, fromColumn: fromCol, toColumn: match[3] });
+          }
+        }
+      }
+    });
+    setIncomingFks(incoming);
+  }, [allTables, table.name]);
 
   const page = Math.floor(offset / 100) + 1;
   const hasNext = state.status === "success" && state.data.totalFetched === 100;
@@ -310,43 +339,91 @@ function DataTab({ databaseId, table, allTables }: DataTabProps) {
                             <span className="text-muted-foreground/60 text-[10px] font-mono lowercase tracking-wide">
                               {col.type}
                             </span>
-                            {col.isPrimary && (
-                              <TooltipProvider delayDuration={200}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Badge variant="secondary" className="h-4 px-1 py-0 gap-0 text-[10px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border-amber-500/20 shadow-none cursor-default">
-                                      <Key size={11} strokeWidth={2.5} />
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="text-xs font-medium">
-                                    Primary Key
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
-                            {col.foreignKeys && col.foreignKeys.length > 0 && (
-                              <TooltipProvider delayDuration={200}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Badge variant="secondary" className="h-4 px-1 gap-1 text-[10px] font-mono bg-muted/60 hover:bg-muted/80 text-muted-foreground cursor-help">
-                                      <Link2 size={10} />
-                                      {col.foreignKeys.length}
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="top" className="text-xs font-medium font-mono">
-                                    <div className="flex flex-col gap-1.5 py-0.5">
-                                      {col.foreignKeys.map((fk, idx) => (
-                                        <div key={idx} className="flex items-center gap-2">
-                                          <span className="text-muted-foreground">{table.name}.{col.name}</span>
-                                          <span className="text-muted-foreground/50">{"->"}</span>
-                                          <span className="text-foreground">{fk.table}.{fk.column}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
+                            {(() => {
+                              const inFks = incomingFks.filter(fk => fk.toColumn === col.name);
+                              const outFks = col.foreignKeys || [];
+                              const hasFks = inFks.length > 0 || outFks.length > 0;
+                              
+                              return (
+                                <>
+                                  {col.isPrimary && (
+                                    <TooltipProvider delayDuration={200}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge 
+                                            variant="secondary" 
+                                            className="h-4 px-1 py-0 gap-0 text-[10px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border-amber-500/20 shadow-none cursor-help"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <Key size={11} strokeWidth={2.5} />
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent 
+                                          side="top" 
+                                          className="text-xs font-medium font-mono min-w-[80px] border border-border bg-background shadow-md px-2 py-1"
+                                          onPointerDown={(e) => e.stopPropagation()}
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <p className="text-muted-foreground uppercase tracking-widest text-[10px] font-sans">Primary Key</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                  
+                                  {hasFks && (
+                                    <TooltipProvider delayDuration={200}>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Badge 
+                                            variant="secondary" 
+                                            className="h-4 px-1 gap-1 text-[10px] font-mono bg-muted/60 hover:bg-muted/80 text-muted-foreground cursor-help"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <Link2 size={10} />
+                                            {outFks.length + inFks.length}
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent 
+                                          side="top" 
+                                          className="text-xs font-medium font-mono min-w-[140px] border border-border bg-background shadow-md pointer-events-auto"
+                                          onPointerDown={(e) => e.stopPropagation()}
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <div className="flex flex-col gap-1.5 py-0.5">
+                                            {outFks.length > 0 && <p className="text-muted-foreground uppercase tracking-widest text-[10px] font-sans pb-0.5 border-b border-border/50">References</p>}
+                                            {outFks.map((fk, idx) => (
+                                              <div key={`out-${idx}`} className="flex items-center gap-2">
+                                                <span className="text-muted-foreground">{table.name}.{col.name}</span>
+                                                <span className="text-muted-foreground/50">{"->"}</span>
+                                                <button 
+                                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTableSelect?.(fk.table); }}
+                                                  className="text-foreground font-semibold hover:underline hover:text-blue-500 transition-colors"
+                                                >
+                                                  {fk.table}.{fk.column}
+                                                </button>
+                                              </div>
+                                            ))}
+                                            {inFks.length > 0 && <p className="text-muted-foreground uppercase tracking-widest text-[10px] font-sans pb-0.5 border-b border-border/50">Referenced By</p>}
+                                            {inFks.map((fk, idx) => (
+                                              <div key={`in-${idx}`} className="flex items-center gap-2">
+                                                <button 
+                                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTableSelect?.(fk.fromTable); }}
+                                                  className="text-foreground font-semibold hover:underline hover:text-blue-500 transition-colors"
+                                                >
+                                                  {fk.fromTable}.{fk.fromColumn}
+                                                </button>
+                                                <span className="text-muted-foreground/50">{"->"}</span>
+                                                <span className="text-muted-foreground">{table.name}.{col.name}</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                           <ChevronDown size={13} className="text-muted-foreground/30 group-hover:text-muted-foreground/80 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </DropdownMenuTrigger>
@@ -694,7 +771,15 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
             {/* Data — requires a selected table */}
             <TabsContent value="data" className="flex-1 min-h-0 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
               {selectedTable
-                ? <DataTab databaseId={database.uuid} table={selectedTable} allTables={tables} />
+                ? <DataTab 
+                    databaseId={database.uuid} 
+                    table={selectedTable} 
+                    allTables={allTables} 
+                    onTableSelect={(name) => {
+                      const t = allTables.find(tbl => tbl.name === name);
+                      if (t) setSelectedTable(t);
+                    }}
+                  />
                 : <PanelMessage icon={Sheet} title="Select a table" body="Click a table name on the left to browse its rows" />}
             </TabsContent>
 
