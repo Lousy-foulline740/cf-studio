@@ -28,10 +28,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, Info, List, ArrowRight, Expand, BookOpen, X, Check, Table2, Trash2 } from "lucide-react";
+import { AlertTriangle, Info, List, ArrowRight, Expand, BookOpen, X, Check, Table2, Trash2, Undo2 } from "lucide-react";
 import type { D1Column, D1TableSchema, D1ForeignKey, D1QueryResult } from "@/hooks/useCloudflare";
 import { invokeCloudflare } from "@/hooks/useCloudflare";
 import { useToast } from "@/components/ui/use-toast";
+
+type DraftForeignKey = D1ForeignKey & {
+  isNew: boolean;
+  isDeleted: boolean;
+};
 
 type DraftColumn = {
   name: string;
@@ -59,7 +64,7 @@ function generateTableRecreationSQL(
   oldColumns: D1Column[],
   draftOldColumnName: string,
   draftColumn: DraftColumn,
-  draftRelations: D1ForeignKey[]
+  draftRelations: DraftForeignKey[]
 ): string[] {
   const newTableName = `${tableName}_new`;
   
@@ -80,7 +85,7 @@ function generateTableRecreationSQL(
     }
   });
 
-  draftRelations.forEach(fk => {
+  draftRelations.filter(fk => !fk.isDeleted).forEach(fk => {
     columnDefs.push(`FOREIGN KEY ("${draftColumn.name}") REFERENCES "${fk.table}" ("${fk.column}") ON UPDATE ${fk.updateAction.toUpperCase()} ON DELETE ${fk.deleteAction.toUpperCase()}`);
   });
 
@@ -133,7 +138,7 @@ export function EditColumnDialog({
     fkColumn: "",
     fkUpdateAction: "No action",
     fkDeleteAction: "No action",
-    draftRelations: [] as D1ForeignKey[],
+    draftRelations: [] as DraftForeignKey[],
   });
   const [fkOpen, setFkOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -153,7 +158,7 @@ export function EditColumnDialog({
         fkColumn: "",
         fkUpdateAction: "No action",
         fkDeleteAction: "No action",
-        draftRelations: column.foreignKeys || [],
+        draftRelations: (column.foreignKeys || []).map(fk => ({ ...fk, isNew: false, isDeleted: false })),
       });
     }
   }, [column, open]);
@@ -182,7 +187,7 @@ export function EditColumnDialog({
     }
 
     const originalFks = column.foreignKeys || [];
-    const draftFks = draftColumn.draftRelations;
+    const draftFks = draftColumn.draftRelations.filter(fk => !fk.isDeleted);
 
     draftFks.forEach(newFk => {
       const exists = originalFks.some(oldFk => oldFk.table === newFk.table && oldFk.column === newFk.column);
@@ -210,7 +215,7 @@ export function EditColumnDialog({
     if (!column) return;
     setIsApplying(true);
     try {
-      const statements = generateTableRecreationSQL(tableName, tableColumns, column.name, draftColumn, draftColumn.draftRelations);
+      const statements = generateTableRecreationSQL(tableName, tableColumns, column.name, draftColumn, draftColumn.draftRelations.filter(fk => !fk.isDeleted));
       
       for (const statement of statements) {
         if (!statement.trim()) continue;
@@ -386,20 +391,36 @@ export function EditColumnDialog({
                 <div className="space-y-2">
                   {draftColumn.draftRelations.map((rel, i) => (
                     <div key={i} className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2">
-                      <span className="text-xs font-mono text-muted-foreground truncate mr-2">
-                        References <span className="text-foreground">{rel.table}.{rel.column}</span>
-                      </span>
+                      <div className="flex items-center gap-2.5 overflow-hidden">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium tracking-wide shrink-0 ${
+                          rel.isNew
+                            ? 'bg-blue-500/15 text-blue-400'
+                            : 'bg-emerald-500/15 text-emerald-400'
+                        }`}>
+                          {rel.isNew ? 'New' : 'Saved'}
+                        </span>
+                        <span className={`text-xs font-mono truncate transition-all duration-200 ${
+                          rel.isDeleted ? 'line-through opacity-40 text-muted-foreground' : 'text-foreground'
+                        }`}>
+                          <span className="font-semibold">{draftColumn.name}</span>
+                          <span className="text-muted-foreground mx-1">→</span>
+                          {rel.table}.{rel.column}
+                        </span>
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                        className={`h-6 w-6 shrink-0 ${rel.isDeleted
+                          ? 'text-muted-foreground hover:text-blue-400 hover:bg-blue-500/10'
+                          : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'
+                        }`}
                         onClick={() => {
                           const newRels = [...draftColumn.draftRelations];
-                          newRels.splice(i, 1);
+                          newRels[i] = { ...newRels[i], isDeleted: !newRels[i].isDeleted };
                           setDraftColumn({ ...draftColumn, draftRelations: newRels });
                         }}
                       >
-                         <Trash2 size={12} />
+                        {rel.isDeleted ? <Undo2 size={12} /> : <Trash2 size={12} />}
                       </Button>
                     </div>
                   ))}
@@ -625,7 +646,9 @@ export function EditColumnDialog({
                     table: draftColumn.fkTable,
                     column: draftColumn.fkColumn,
                     updateAction: draftColumn.fkUpdateAction,
-                    deleteAction: draftColumn.fkDeleteAction
+                    deleteAction: draftColumn.fkDeleteAction,
+                    isNew: true,
+                    isDeleted: false
                   }],
                   fkTable: "", fkColumn: "", fkUpdateAction: "No action", fkDeleteAction: "No action"
                 });
