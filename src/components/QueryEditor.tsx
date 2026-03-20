@@ -12,6 +12,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 import {
   Table, TableBody, TableCell,
@@ -55,6 +61,18 @@ function getColumnsFromSql(sql: string | null): [string, string] {
   return [cols[0] || "col1", cols[1] || cols[0] || "col2"];
 }
 
+const PRAGMA_TOOLTIPS: Record<string, string> = {
+  ncol: "Number of columns in the table",
+  wr: "WITHOUT ROWID (1 if true, 0 if false)",
+  strict: "STRICT table (1 if true, 0 if false)",
+  cid: "Column ID",
+  notnull: "NOT NULL constraint (1 if true, 0 if false)",
+  dflt_value: "Default value",
+  pk: "Primary Key (1 if true, 0 if false)",
+  schema: "The database schema (usually 'main')",
+  type: "Object type (e.g. table, view, index)",
+};
+
 // ── Result data table (shared display component) ───────────────────────────────
 
 const PAGE = 50;
@@ -83,11 +101,29 @@ function ResultTable({
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30">
                 <TableHead className={`w-10 text-center text-[10px] text-muted-foreground/40 font-mono px-2 ${paddingY}`}>#</TableHead>
-                {columns.map((col) => (
-                  <TableHead key={col} className={`text-xs font-medium uppercase tracking-wider text-muted-foreground whitespace-nowrap ${paddingY}`}>
-                    {col}
-                  </TableHead>
-                ))}
+                {columns.map((col) => {
+                  const tooltipText = PRAGMA_TOOLTIPS[col.toLowerCase()];
+                  return (
+                    <TableHead key={col} className={`text-xs font-medium uppercase tracking-wider text-muted-foreground whitespace-nowrap ${paddingY}`}>
+                      {tooltipText ? (
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help border-b border-dotted border-muted-foreground/60 transition-colors hover:text-foreground">
+                                {col}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs font-sans normal-case tracking-normal">
+                              {tooltipText}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        col
+                      )}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             </TableHeader>
             <TableBody>
