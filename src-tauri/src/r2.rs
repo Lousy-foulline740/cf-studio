@@ -1,202 +1,370 @@
-// CF Studio — Cloudflare R2 file management via AWS S3–compatible API
+// r2.rs
 //
-// Architecture:
-//   • Pre-signed PUT URLs let the frontend upload large files directly to R2,
-//     bypassing the Tauri IPC bridge entirely.
-//   • ListObjectsV2 with Delimiter="/" simulates a traditional folder structure
-//     using S3 prefixes + CommonPrefixes.
+// Cloudflare R2 File Management API — list buckets, objects, and perform file operations.
+// Operates over the CloudflareClient using the Wrangler OAuth token (zero-touch auth).
+// Bypasses the need for S3 Access Keys entirely using Cloudflare's direct REST API.
 
-use std::time::Duration;
+use serde::{Deserialize, Serialize};
+use reqwest::header::CONTENT_TYPE;
 
-use aws_credential_types::provider::SharedCredentialsProvider;
-use aws_credential_types::Credentials;
-use aws_sdk_s3::config::{BehaviorVersion, Region};
-use aws_sdk_s3::presigning::PresigningConfig;
-use aws_sdk_s3::Client;
-use serde::Serialize;
-use tokio::sync::OnceCell;
+use crate::cloudflare_auth::{read_credentials, AuthError};
+use crate::cloudflare_client::{CfError, CfResponse, CloudflareClient};
 
-// ── Singleton R2 Client ────────────────────────────────────────────────────────
+// ── Error type ─────────────────────────────────────────────────────────────────
 
-/// Lazily-initialized S3 client configured for Cloudflare R2.
-static R2_CLIENT: OnceCell<Client> = OnceCell::const_new();
-
-/// Bucket name resolved once from `R2_BUCKET_NAME` env var.
-static R2_BUCKET: OnceCell<String> = OnceCell::const_new();
-
-/// Build and cache the S3 client targeting the R2 endpoint.
-///
-/// Required environment variables:
-///   R2_ACCOUNT_ID        — Cloudflare account ID (used to form the endpoint)
-///   R2_ACCESS_KEY_ID     — R2 API token key ID
-///   R2_SECRET_ACCESS_KEY — R2 API token secret
-///   R2_BUCKET_NAME       — Target R2 bucket
-async fn get_client() -> Result<&'static Client, R2Error> {
-    R2_CLIENT
-        .get_or_try_init(|| async {
-            let account_id = std::env::var("R2_ACCOUNT_ID")
-                .map_err(|_| R2Error::MissingEnv("R2_ACCOUNT_ID"))?;
-            let access_key = std::env::var("R2_ACCESS_KEY_ID")
-                .map_err(|_| R2Error::MissingEnv("R2_ACCESS_KEY_ID"))?;
-            let secret_key = std::env::var("R2_SECRET_ACCESS_KEY")
-                .map_err(|_| R2Error::MissingEnv("R2_SECRET_ACCESS_KEY"))?;
-
-            // Cache the bucket name while we're reading env vars.
-            let bucket = std::env::var("R2_BUCKET_NAME")
-                .map_err(|_| R2Error::MissingEnv("R2_BUCKET_NAME"))?;
-            let _ = R2_BUCKET.set(bucket);
-
-            // R2 endpoint format: https://<account_id>.r2.cloudflarestorage.com
-            let endpoint = format!("https://{account_id}.r2.cloudflarestorage.com");
-
-            let creds = Credentials::new(access_key, secret_key, None, None, "cf-studio-r2");
-
-            let config = aws_sdk_s3::Config::builder()
-                .behavior_version(BehaviorVersion::latest())
-                // R2 uses a custom endpoint — not real AWS.
-                .endpoint_url(&endpoint)
-                // R2 ignores the region, but the SDK requires one; "auto" is the R2 convention.
-                .region(Region::new("auto"))
-                .credentials_provider(SharedCredentialsProvider::new(creds))
-                // R2 requires path-style addressing (bucket in the path, not subdomain).
-                .force_path_style(true)
-                .build();
-
-            Ok(Client::from_conf(config))
-        })
-        .await
-}
-
-async fn get_bucket() -> Result<&'static str, R2Error> {
-    // Ensure the client (and bucket) are initialized.
-    let _ = get_client().await?;
-    R2_BUCKET
-        .get()
-        .map(|s| s.as_str())
-        .ok_or(R2Error::MissingEnv("R2_BUCKET_NAME"))
-}
-
-// ── Error Type ─────────────────────────────────────────────────────────────────
-
-#[derive(Debug, thiserror::Error, Serialize)]
+#[derive(Debug, thiserror::Error)]
 pub enum R2Error {
-    #[error("Missing environment variable: {0}")]
-    MissingEnv(&'static str),
+    #[error("Authentication error: {0}")]
+    Auth(#[from] AuthError),
 
-    #[error("R2 operation failed: {0}")]
-    S3(String),
+    #[error("HTTP error: {0}")]
+    Http(#[from] reqwest::Error),
 
-    #[error("Presigning failed: {0}")]
-    Presign(String),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Could not determine your Cloudflare account ID. Your account may not have API access.")]
+    NoAccountId,
+
+    #[error("Cloudflare API error(s): {0}")]
+    Api(String),
 }
 
-// ── Response Types ─────────────────────────────────────────────────────────────
-
-#[derive(Serialize)]
-pub struct PresignedUploadUrl {
-    /// The pre-signed PUT URL that the frontend can upload to directly.
-    pub url: String,
-    /// Validity period in seconds.
-    pub expires_in: u64,
+impl Serialize for R2Error {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&self.to_string())
+    }
 }
 
-#[derive(Serialize)]
+// ── API types ──────────────────────────────────────────────────────────────────
+
+/// Minimal account info from `GET /accounts`.
+#[derive(Debug, Deserialize)]
+struct CfAccount {
+    id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct R2Bucket {
+    pub name: String,
+    pub creation_date: String,
+    pub object_count: Option<u64>,
+    pub total_size_bytes: Option<u64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BucketsResponse {
+    pub buckets: Vec<R2Bucket>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct R2Object {
-    /// Full object key, e.g. "projects/assets/logo.png"
     pub key: String,
-    /// Object size in bytes.
-    pub size: i64,
-    /// ISO-8601 last-modified timestamp.
-    pub last_modified: String,
+    pub size: u64,
+    pub uploaded: String,
+    pub etag: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ObjectsResponse {
+    pub objects: Option<Vec<serde_json::Value>>,
+    #[serde(rename = "delimitedPrefixes")]
+    pub delimited_prefixes: Option<Vec<serde_json::Value>>,
+    pub truncated: bool,
+    pub cursor: Option<String>,
 }
 
 #[derive(Serialize)]
 pub struct FolderListing {
-    /// Objects at this prefix level (files).
     pub files: Vec<R2Object>,
-    /// Common prefixes at this level (sub-folders).
     pub folders: Vec<String>,
+}
+
+// ── Helper ─────────────────────────────────────────────────────────────────────
+
+fn api_errors_to_string(errors: &[CfError]) -> String {
+    errors
+        .iter()
+        .map(|e| format!("[{}] {}", e.code, e.message))
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+async fn resolve_account_id(client: &CloudflareClient) -> Result<String, R2Error> {
+    let resp = client
+        .get("accounts")
+        .send()
+        .await?
+        .json::<CfResponse<Vec<CfAccount>>>()
+        .await?;
+
+    if !resp.success {
+        return Err(R2Error::Api(api_errors_to_string(&resp.errors)));
+    }
+
+    let accounts = resp.result.unwrap_or_default();
+    accounts
+        .into_iter()
+        .next()
+        .map(|a| a.id)
+        .ok_or(R2Error::NoAccountId)
 }
 
 // ── Tauri Commands ─────────────────────────────────────────────────────────────
 
-/// Generate a pre-signed PUT URL for direct-to-R2 uploads.
-///
-/// `file_path` is the R2 object key, e.g. "projects/video.mp4".
-/// Returns a URL valid for 15 minutes.
+/// Fetches the list of all R2 buckets for the authenticated Cloudflare account.
 #[tauri::command]
-pub async fn get_upload_url(file_path: String) -> Result<PresignedUploadUrl, R2Error> {
-    let client = get_client().await?;
-    let bucket = get_bucket().await?;
-
-    let expires_in = Duration::from_secs(15 * 60); // 15 minutes
-
-    let presigning_config = PresigningConfig::builder()
-        .expires_in(expires_in)
-        .build()
-        .map_err(|e| R2Error::Presign(e.to_string()))?;
-
-    let presigned = client
-        .put_object()
-        .bucket(bucket)
-        .key(&file_path)
-        .presigned(presigning_config)
+pub async fn fetch_r2_buckets() -> Result<Vec<R2Bucket>, R2Error> {
+    let creds = tokio::task::spawn_blocking(read_credentials)
         .await
-        .map_err(|e| R2Error::Presign(e.to_string()))?;
+        .map_err(|e| R2Error::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))??;
 
-    Ok(PresignedUploadUrl {
-        url: presigned.uri().to_string(),
-        expires_in: 15 * 60,
-    })
+    let client = CloudflareClient::new(&creds.oauth_token)?;
+    let account_id = match creds.account_id {
+        Some(id) => id,
+        None => resolve_account_id(&client).await?,
+    };
+
+    let resp = client
+        .get(&format!("accounts/{}/r2/buckets", account_id))
+        .send()
+        .await?
+        .json::<CfResponse<BucketsResponse>>()
+        .await?;
+
+    if !resp.success {
+        return Err(R2Error::Api(api_errors_to_string(&resp.errors)));
+    }
+
+    let mut buckets = resp.result.map(|r| r.buckets).unwrap_or_default();
+
+    // ── GraphQL Stats Fetching ───────────────────────────────────────────────
+    let date_geq = chrono::Utc::now()
+        .checked_sub_days(chrono::Days::new(2))
+        .unwrap_or_else(chrono::Utc::now)
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string();
+
+    let query = format!(
+        r#"query {{ viewer {{ accounts(filter: {{accountTag: "{account_id}"}}) {{ r2StorageAdaptiveGroups(limit: 1000, filter: {{datetime_geq: "{date_geq}"}}) {{ dimensions {{ bucketName }} max {{ objectCount payloadSize }} }} }} }} }}"#
+    );
+
+    let gql_resp = client
+        .post("graphql")
+        .json(&serde_json::json!({ "query": query }))
+        .send()
+        .await;
+
+    if let Ok(gql_res) = gql_resp {
+        if let Ok(data) = gql_res.json::<serde_json::Value>().await {
+            // Traverse down to `r2StorageAdaptiveGroups` array safely
+            if let Some(groups) = data["data"]["viewer"]["accounts"][0]["r2StorageAdaptiveGroups"].as_array() {
+                let mut stats_map = std::collections::HashMap::new();
+                for group in groups {
+                    if let Some(bname) = group["dimensions"]["bucketName"].as_str() {
+                        let count = group["max"]["objectCount"].as_u64().unwrap_or(0);
+                        let size = group["max"]["payloadSize"].as_u64().unwrap_or(0);
+                        stats_map.insert(bname.to_string(), (count, size));
+                    }
+                }
+
+                for b in &mut buckets {
+                    if let Some(&(count, size)) = stats_map.get(&b.name) {
+                        b.object_count = Some(count);
+                        b.total_size_bytes = Some(size);
+                    } else {
+                        b.object_count = Some(0);
+                        b.total_size_bytes = Some(0);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(buckets)
 }
 
-/// List the contents of a "folder" in R2 using prefix + delimiter.
-///
-/// `prefix` should end with "/" to list a directory, e.g. "projects/".
-/// Pass an empty string to list the bucket root.
+/// Lists objects (files) and common prefixes (folders) at a specific prefix.
 #[tauri::command]
-pub async fn list_folder(prefix: String) -> Result<FolderListing, R2Error> {
-    let client = get_client().await?;
-    let bucket = get_bucket().await?;
-
-    let response = client
-        .list_objects_v2()
-        .bucket(bucket)
-        .prefix(&prefix)
-        // Delimiter "/" causes S3 to group keys under shared prefixes,
-        // effectively simulating sub-folders in CommonPrefixes.
-        .delimiter("/")
-        .send()
+pub async fn list_r2_objects(bucket_name: String, prefix: String) -> Result<FolderListing, R2Error> {
+    let creds = tokio::task::spawn_blocking(read_credentials)
         .await
-        .map_err(|e| R2Error::S3(e.to_string()))?;
+        .map_err(|e| R2Error::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))??;
 
-    // Map S3 Objects → R2Object structs (files at this level).
-    let files = response
-        .contents()
-        .iter()
-        .filter_map(|obj| {
-            let key = obj.key()?.to_string();
-            // Skip the prefix itself if it appears as an object (folder marker).
-            if key == prefix {
-                return None;
-            }
-            Some(R2Object {
+    let client = CloudflareClient::new(&creds.oauth_token)?;
+    let account_id = match creds.account_id {
+        Some(id) => id,
+        None => resolve_account_id(&client).await?,
+    };
+
+    let mut url = format!("accounts/{}/r2/buckets/{}/objects?delimiter=/", account_id, bucket_name);
+    if !prefix.is_empty() {
+        // Cloudflare requires URL encoded query params
+        url = format!("{}&prefix={}", url, urlencoding::encode(&prefix));
+    }
+
+    let text = client
+        .get(&url)
+        .send()
+        .await?
+        .text()
+        .await?;
+        
+    println!("RAW OBJECTS RESPONSE: {}", text);
+    
+    let resp = client
+        .get(&url)
+        .send()
+        .await?
+        .json::<CfResponse<Vec<serde_json::Value>>>()
+        .await?;
+
+    if !resp.success {
+        return Err(R2Error::Api(api_errors_to_string(&resp.errors)));
+    }
+
+    let all_objects = resp.result.unwrap_or_default();
+    
+    let mut files = Vec::new();
+    let mut folders = std::collections::HashSet::new();
+
+    // Cloudflare's REST API returns a flat array. We simulate folder architecture manually:
+    for obj in all_objects {
+        let key = obj["key"].as_str().unwrap_or("").to_string();
+        
+        // If a prefix is requested, ignore objects that don't start with it
+        if !prefix.is_empty() && !key.starts_with(&prefix) {
+            continue;
+        }
+
+        // Determine the relative path after the prefix
+        let relative_path = if prefix.is_empty() {
+            &key[..]
+        } else {
+            &key[prefix.len()..]
+        };
+
+        if let Some(slash_idx) = relative_path.find('/') {
+            // It's a folder: extract the folder name (up to and including the `/`)
+            let folder_name = &relative_path[..=slash_idx];
+            folders.insert(format!("{}{}", prefix, folder_name));
+        } else {
+            // It's a file at the current depth
+            files.push(R2Object {
                 key,
-                size: obj.size().unwrap_or(0),
-                last_modified: obj
-                    .last_modified()
-                    .map(|dt| dt.fmt(aws_sdk_s3::primitives::DateTimeFormat::DateTime).unwrap_or_default())
-                    .unwrap_or_default(),
-            })
-        })
-        .collect();
+                size: obj["size"].as_u64().unwrap_or(0),
+                uploaded: obj["last_modified"].as_str().unwrap_or(obj["uploaded"].as_str().unwrap_or("")).to_string(),
+                etag: obj["etag"].as_str().unwrap_or("").to_string(),
+            });
+        }
+    }
 
-    // Map CommonPrefixes → folder name strings.
-    let folders = response
-        .common_prefixes()
-        .iter()
-        .filter_map(|cp| cp.prefix().map(|p| p.to_string()))
-        .collect();
+    // Capture explicit simulated directories returned by Cloudflare's delimiter param
+    if let Some(info) = resp.result_info {
+        if let Some(delimited) = info.get("delimited").and_then(|v| v.as_array()) {
+            for v in delimited {
+                if let Some(s) = v.as_str() {
+                    folders.insert(s.to_string());
+                }
+            }
+        }
+    }
 
-    Ok(FolderListing { files, folders })
+    let mut folders_vec: Vec<String> = folders.into_iter().collect();
+    folders_vec.sort();
+
+    Ok(FolderListing { files, folders: folders_vec })
+}
+
+/// Deletes an object by key.
+#[tauri::command]
+pub async fn delete_r2_object(bucket_name: String, key: String) -> Result<(), R2Error> {
+    let creds = tokio::task::spawn_blocking(read_credentials)
+        .await
+        .map_err(|e| R2Error::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))??;
+
+    let client = CloudflareClient::new(&creds.oauth_token)?;
+    let account_id = match creds.account_id {
+        Some(id) => id,
+        None => resolve_account_id(&client).await?,
+    };
+
+    let url = format!("accounts/{}/r2/buckets/{}/objects/{}", account_id, bucket_name, urlencoding::encode(&key));
+    
+    let resp = client
+        .delete(&url)
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        // sometimes delete endpoints return a CfResponse, sometimes just 200/204 empty
+        let text = resp.text().await.unwrap_or_default();
+        return Err(R2Error::Api(format!("Delete failed: {}", text)));
+    }
+
+    Ok(())
+}
+
+/// Uploads a local file directly to R2 using Cloudflare REST API.
+#[tauri::command]
+pub async fn upload_r2_object(bucket_name: String, key: String, local_path: String) -> Result<(), R2Error> {
+    let creds = tokio::task::spawn_blocking(read_credentials)
+        .await
+        .map_err(|e| R2Error::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))??;
+
+    let client = CloudflareClient::new(&creds.oauth_token)?;
+    let account_id = match creds.account_id {
+        Some(id) => id,
+        None => resolve_account_id(&client).await?,
+    };
+
+    let file_bytes = tokio::fs::read(&local_path).await?;
+    let mime_type = mime_guess::from_path(&local_path).first_or_octet_stream();
+
+    let url = format!("accounts/{}/r2/buckets/{}/objects/{}", account_id, bucket_name, urlencoding::encode(&key));
+    
+    let resp = client
+        .put(&url)
+        .header(CONTENT_TYPE, mime_type.as_ref())
+        .body(file_bytes)
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(R2Error::Api(format!("Upload failed: {}", text)));
+    }
+
+    Ok(())
+}
+
+/// Downloads an object from R2 to the local disk.
+#[tauri::command]
+pub async fn download_r2_object(bucket_name: String, key: String, destination_path: String) -> Result<(), R2Error> {
+    let creds = tokio::task::spawn_blocking(read_credentials)
+        .await
+        .map_err(|e| R2Error::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))??;
+
+    let client = CloudflareClient::new(&creds.oauth_token)?;
+    let account_id = match creds.account_id {
+        Some(id) => id,
+        None => resolve_account_id(&client).await?,
+    };
+
+    let url = format!("accounts/{}/r2/buckets/{}/objects/{}", account_id, bucket_name, urlencoding::encode(&key));
+    
+    let resp = client
+        .get(&url)
+        .send()
+        .await?;
+
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(R2Error::Api(format!("Download failed: {}", text)));
+    }
+
+    let bytes = resp.bytes().await?;
+    tokio::fs::write(&destination_path, bytes).await?;
+
+    Ok(())
 }

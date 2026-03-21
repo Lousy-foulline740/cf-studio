@@ -16,6 +16,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/store/useAppStore";
+import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { useD1Databases, type D1Database, invokeCloudflare } from "@/hooks/useCloudflare";
 import { DatabaseExplorer } from "@/components/DatabaseExplorer";
 
@@ -103,12 +105,13 @@ function LoadingSkeleton() {
 }
 
 interface EmptyStateProps {
-  variant: "no-auth" | "no-databases" | "api-error";
+  variant: "no-auth" | "no-databases" | "api-error" | "not-enabled";
   message?: string;
   onRefresh: () => void;
+  accountId?: string | null;
 }
 
-function EmptyState({ variant, message, onRefresh }: EmptyStateProps) {
+function EmptyState({ variant, message, onRefresh, accountId }: EmptyStateProps) {
   const configs = {
     "no-auth": {
       icon: Terminal,
@@ -139,6 +142,26 @@ function EmptyState({ variant, message, onRefresh }: EmptyStateProps) {
           This Cloudflare account has no D1 databases yet. Create one with:
           <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-muted/60 px-3 py-2 font-mono text-sm text-foreground">
             <span className="select-text">wrangler d1 create my-database</span>
+          </div>
+        </>
+      ),
+    },
+    "not-enabled": {
+      icon: Database,
+      iconColor: "text-blue-500",
+      title: "Cloudflare D1 Not Enabled",
+      body: (
+        <>
+          It looks like Cloudflare D1 Serverless SQL is not yet enabled for this account. You must enable it in the dashboard before creating databases.
+          <div className="mt-5 flex items-center justify-center">
+            <Button
+              onClick={() => {
+                if (accountId) openUrl(`https://dash.cloudflare.com/${accountId}/workers/d1`);
+              }}
+              size="sm"
+            >
+              Enable D1 SQL
+            </Button>
           </div>
         </>
       ),
@@ -240,6 +263,7 @@ interface DatabaseListProps {
 
 function DatabaseList({ onSelect }: DatabaseListProps) {
   const { state, refresh } = useD1Databases();
+  const activeAccount = useAppStore((s) => s.activeAccount);
   const isLoading = state.status === "loading" || state.status === "idle";
 
   return (
@@ -269,6 +293,14 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
         {isLoading && <LoadingSkeleton />}
 
         {state.status === "error" &&
+          (state.message.toLowerCase().includes("10023") ||
+            state.message.toLowerCase().includes("10036") ||
+            state.message.toLowerCase().includes("enable d1")) && (
+            <EmptyState variant="not-enabled" accountId={activeAccount?.id} onRefresh={refresh} />
+          )}
+
+        {state.status === "error" &&
+          !(state.message.toLowerCase().includes("10023") || state.message.toLowerCase().includes("10036") || state.message.toLowerCase().includes("enable d1")) &&
           (state.message.toLowerCase().includes("wrangler") ||
             state.message.toLowerCase().includes("oauth") ||
             state.message.toLowerCase().includes("not found")) && (
@@ -276,6 +308,7 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
           )}
 
         {state.status === "error" &&
+          !(state.message.toLowerCase().includes("10023") || state.message.toLowerCase().includes("10036") || state.message.toLowerCase().includes("enable d1")) &&
           !state.message.toLowerCase().includes("wrangler") &&
           !state.message.toLowerCase().includes("oauth") &&
           !state.message.toLowerCase().includes("not found") && (

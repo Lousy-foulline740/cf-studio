@@ -47,9 +47,11 @@ pub fn run() {
             d1::fetch_d1_databases,
             d1::execute_d1_query,
             d1::get_d1_database_info,
-            user::fetch_user_profile,
-            r2::get_upload_url,
-            r2::list_folder,
+            r2::fetch_r2_buckets,
+            r2::list_r2_objects,
+            r2::delete_r2_object,
+            r2::upload_r2_object,
+            r2::download_r2_object,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

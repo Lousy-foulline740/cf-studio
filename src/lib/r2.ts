@@ -1,21 +1,24 @@
-// CF Studio — Cloudflare R2 frontend helpers
+// r2.ts
 //
-// Uploads use pre-signed PUT URLs, sending file bytes directly to R2 over HTTPS.
-// This bypasses Tauri IPC entirely, avoiding large binary serialization overhead.
+// API wrappers for the Cloudflare R2 zero-touch commands.
+// All requests are proxied via Tauri to use the Wrangler OAuth token seamlessly.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invokeCloudflare } from "@/hooks/useCloudflare";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface PresignedUploadUrl {
-  url: string;
-  expires_in: number;
+export interface R2Bucket {
+  name: string;
+  creation_date: string;
+  object_count?: number;
+  total_size_bytes?: number;
 }
 
 export interface R2Object {
   key: string;
   size: number;
-  last_modified: string;
+  uploaded: string;
+  etag: string;
 }
 
 export interface FolderListing {
@@ -26,56 +29,62 @@ export interface FolderListing {
 // ── R2 Operations ──────────────────────────────────────────────────────────────
 
 /**
- * Request a pre-signed PUT URL for the given R2 object key.
- * @param filePath — R2 key, e.g. "projects/assets/video.mp4"
+ * Fetch all buckets for the authenticated Cloudflare account.
  */
-export async function getUploadUrl(
-  filePath: string
-): Promise<PresignedUploadUrl> {
-  return invoke<PresignedUploadUrl>("get_upload_url", { filePath });
+export async function fetchR2Buckets(): Promise<R2Bucket[]> {
+  return invokeCloudflare<R2Bucket[]>("fetch_r2_buckets");
 }
 
 /**
- * Upload a File directly to R2 via a pre-signed PUT URL.
- *
- * Flow:
- *   1. Obtain a pre-signed URL from the Rust backend (Tauri IPC).
- *   2. PUT the raw file bytes to R2 over HTTPS — no IPC for the payload.
- *
- * @param file   — File object from an <input type="file"> element.
- * @param r2Key  — Desired R2 object key, e.g. "uploads/photo.jpg".
- * @returns        The fetch Response from R2 (status 200 on success).
- * @throws         On network error or non-OK HTTP status.
+ * List files and folders in a specific bucket under a given prefix.
+ * @param bucketName - The R2 bucket name
+ * @param prefix - Folder prefix ending with "/", e.g. "projects/". Empty string for root.
  */
-export async function uploadFileToR2(
-  file: File,
-  r2Key: string
-): Promise<Response> {
-  const { url } = await getUploadUrl(r2Key);
+export async function listR2Objects(
+  bucketName: string,
+  prefix: string
+): Promise<FolderListing> {
+  return invokeCloudflare<FolderListing>("list_r2_objects", { bucketName, prefix });
+}
 
-  const response = await fetch(url, {
-    method: "PUT",
-    headers: {
-      // R2 respects Content-Type set during upload.
-      "Content-Type": file.type || "application/octet-stream",
-    },
-    // Send the raw File blob — no base64, no JSON wrapping.
-    body: file,
+/**
+ * Upload a local file to R2 directly.
+ * @param bucketName - The target R2 bucket name.
+ * @param key - The destination key (e.g. "uploads/photo.jpg").
+ * @param localPath - The absolute path of the local file to upload.
+ */
+export async function uploadR2Object(
+  bucketName: string,
+  key: string,
+  localPath: string
+): Promise<void> {
+  return invokeCloudflare<void>("upload_r2_object", { bucketName, key, localPath });
+}
+
+/**
+ * Delete an object from R2.
+ */
+export async function deleteR2Object(
+  bucketName: string,
+  key: string
+): Promise<void> {
+  return invokeCloudflare<void>("delete_r2_object", { bucketName, key });
+}
+
+/**
+ * Download an object from R2 to the local filesystem.
+ * @param bucketName - The source R2 bucket name.
+ * @param key - The source R2 key.
+ * @param destinationPath - The absolute path to save the file locally.
+ */
+export async function downloadR2Object(
+  bucketName: string,
+  key: string,
+  destinationPath: string
+): Promise<void> {
+  return invokeCloudflare<void>("download_r2_object", {
+    bucketName,
+    key,
+    destinationPath,
   });
-
-  if (!response.ok) {
-    throw new Error(
-      `R2 upload failed: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response;
-}
-
-/**
- * List files and sub-folders at the given R2 prefix.
- * @param prefix — Folder prefix ending with "/", e.g. "projects/". Empty string for root.
- */
-export async function listFolder(prefix: string): Promise<FolderListing> {
-  return invoke<FolderListing>("list_folder", { prefix });
 }

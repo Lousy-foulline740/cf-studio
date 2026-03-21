@@ -22,6 +22,7 @@ import { useTheme, type Theme } from "@/components/ThemeProvider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SessionRefreshModal } from "@/components/SessionRefreshModal";
+import { R2BucketsView } from "@/pro_modules/frontend/R2BucketsView";
 import {
   useAppStore,
   // We need UserProfile type from store
@@ -51,8 +52,6 @@ const NAV_GROUPS: NavGroup[] = [
         id: "r2",
         label: "R2 Buckets",
         icon: Box,
-        disabled: true,
-        badge: "Soon",
       },
       { id: "d1", label: "Databases (D1)", icon: Database },
       {
@@ -314,6 +313,7 @@ function TitleBar({ collapsed, onToggle, title }: TitleBarProps) {
 // ── Simple page router ────────────────────────────────────────────────────────
 function PageContent({ activeId }: { activeId: string }) {
   if (activeId === "d1") return <DatabasesView />;
+  if (activeId === "r2") return <R2BucketsView />;
   if (activeId === "settings") return <SettingsView />;
   // KV and Settings views will be added in subsequent steps
   return (
@@ -327,7 +327,7 @@ function PageContent({ activeId }: { activeId: string }) {
 
 export function Layout() {
   const [collapsed, setCollapsed] = useState(false);
-  const [activeId, setActiveId] = useState("d1");
+  const [activeId, setActiveId] = useState("r2");
   const userProfile = useAppStore((s) => s.userProfile);
   const setUserProfile = useAppStore((s) => s.setUserProfile);
   const activeAccount = useAppStore((s) => s.activeAccount);

@@ -21,6 +21,7 @@ pub struct CfResponse<T> {
     pub result: Option<T>,
     pub success: bool,
     pub errors: Vec<CfError>,
+    pub result_info: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -71,6 +72,11 @@ impl CloudflareClient {
     /// Shorthand: POST `{base_url}/{path}`
     pub fn post(&self, path: &str) -> reqwest::RequestBuilder {
         self.inner.post(format!("{}/{}", self.base_url, path))
+    }
+
+    /// Shorthand: PUT `{base_url}/{path}`
+    pub fn put(&self, path: &str) -> reqwest::RequestBuilder {
+        self.inner.put(format!("{}/{}", self.base_url, path))
     }
 
     /// Shorthand: DELETE `{base_url}/{path}`

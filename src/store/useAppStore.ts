@@ -10,6 +10,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { D1Database, CloudflareAccount } from "@/hooks/useCloudflare";
+import type { R2Bucket } from "@/lib/r2";
 
 export interface UserProfile {
   id: string;
@@ -46,6 +47,7 @@ interface AppState {
   activeAccount: CloudflareAccount | null;
   databases: D1Database[];
   kvNamespaces: KVNamespace[];
+  r2Buckets: R2Bucket[];
 
   // ── Preferences ──
   tableDensity: "compact" | "comfortable";
@@ -56,6 +58,9 @@ interface AppState {
 
   /** Unix timestamp (ms) of the last successful KV fetch, or null. */
   kvLastFetched: number | null;
+
+  /** Unix timestamp (ms) of the last successful R2 buckets fetch, or null. */
+  r2LastFetched: number | null;
 
   // ── Session Cache (Volatile, not persisted) ──
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,6 +79,9 @@ interface AppState {
 
   /** Overwrite the KV namespaces list and stamp the fetch time. */
   setKvNamespaces: (namespaces: KVNamespace[]) => void;
+
+  /** Overwrite the R2 buckets list and stamp the fetch time. */
+  setR2Buckets: (buckets: R2Bucket[]) => void;
 
   /**
    * Wipe all cached data and timestamps.
@@ -98,10 +106,12 @@ export const useAppStore = create<AppState>()(
       activeAccount: null,
       databases: [],
       kvNamespaces: [],
+      r2Buckets: [],
       tableDensity: "comfortable",
       isRefreshingSession: false,
       lastFetched: null,
       kvLastFetched: null,
+      r2LastFetched: null,
       queryCache: {},
 
       // ── Actions ──
@@ -117,6 +127,9 @@ export const useAppStore = create<AppState>()(
       setKvNamespaces: (namespaces) =>
         set({ kvNamespaces: namespaces, kvLastFetched: Date.now() }),
 
+      setR2Buckets: (buckets) =>
+        set({ r2Buckets: buckets, r2LastFetched: Date.now() }),
+
       clearCache: () =>
         set({
           userProfile: null,
@@ -125,8 +138,10 @@ export const useAppStore = create<AppState>()(
           activeAccount: null,
           databases: [],
           kvNamespaces: [],
+          r2Buckets: [],
           lastFetched: null,
           kvLastFetched: null,
+          r2LastFetched: null,
           queryCache: {},
         }),
 
@@ -160,8 +175,10 @@ export const useAppStore = create<AppState>()(
         tableDensity: state.tableDensity,
         databases: state.databases,
         kvNamespaces: state.kvNamespaces,
+        r2Buckets: state.r2Buckets,
         lastFetched: state.lastFetched,
         kvLastFetched: state.kvLastFetched,
+        r2LastFetched: state.r2LastFetched,
       }),
     }
   )
@@ -172,4 +189,9 @@ export const useAppStore = create<AppState>()(
 export const selectDatabases   = (s: AppState) => s.databases;
 export const selectLastFetched = (s: AppState) => s.lastFetched;
 export const selectSetDatabases = (s: AppState) => s.setDatabases;
+
+export const selectR2Buckets   = (s: AppState) => s.r2Buckets;
+export const selectR2LastFetched = (s: AppState) => s.r2LastFetched;
+export const selectSetR2Buckets = (s: AppState) => s.setR2Buckets;
+
 export const selectClearCache  = (s: AppState) => s.clearCache;

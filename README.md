@@ -60,9 +60,9 @@ Ensure you have the following installed on your system:
 - [x] D1 database listing and data grid viewer
 - [x] SQL query execution engine
 - [x] Interactive Visual Schema (ER Diagram)
+- [ ] Bulk D1 data Export/Import (In Progress)
 - [ ] R2 Storage Explorer (In Progress)
 - [ ] KV namespace CRUD operations
-- [ ] Bulk data Export/Import (CSV/JSON)
 - More features coming soon
 
 ## Contributing

@@ -14,8 +14,12 @@ import {
   selectDatabases,
   selectLastFetched,
   selectSetDatabases,
+  selectR2Buckets,
+  selectR2LastFetched,
+  selectSetR2Buckets,
   CACHE_TTL_MS,
 } from "@/store/useAppStore";
+import { type R2Bucket, fetchR2Buckets } from "@/lib/r2";
 
 // ── API Interceptor ────────────────────────────────────────────────────────────
 
@@ -160,7 +164,7 @@ export function useCloudflareAccounts() {
 // ── D1 Databases hook ──────────────────────────────────────────────────────────
 
 export function useD1Databases() {
-  const cached     = useAppStore(selectDatabases);
+  const cached     = useAppStore(selectDatabases) || [];
   const lastFetched = useAppStore(selectLastFetched);
   const setDatabases = useAppStore(selectSetDatabases);
 
@@ -198,6 +202,45 @@ export function useD1Databases() {
   return { state, refresh: fetchFromApi, isFromCache };
 }
 
+// ── R2 Buckets hook ────────────────────────────────────────────────────────────
+
+export function useR2Buckets() {
+  const cached = useAppStore(selectR2Buckets) || [];
+  const lastFetched = useAppStore(selectR2LastFetched);
+  const setBuckets = useAppStore(selectSetR2Buckets);
+
+  // Seed local state from cache immediately
+  const [state, setState] = useState<AsyncState<R2Bucket[]>>(() =>
+    cached.length > 0 && !isCacheStale(lastFetched)
+      ? { status: "success", data: cached }
+      : { status: "idle" }
+  );
+
+  const [isFromCache, setIsFromCache] = useState(
+    cached.length > 0 && !isCacheStale(lastFetched)
+  );
+
+  const fetchFromApi = useCallback(async () => {
+    setState({ status: "loading" });
+    setIsFromCache(false);
+    try {
+      // fetchR2Buckets is in r2.ts and uses invokeCloudflare under the hood
+      const buckets = await fetchR2Buckets();
+      setBuckets(buckets);
+      setState({ status: "success", data: buckets });
+    } catch (err) {
+      setState({ status: "error", message: String(err) });
+    }
+  }, [setBuckets]);
+
+  useEffect(() => {
+    if (cached.length > 0 && !isCacheStale(lastFetched)) return;
+    fetchFromApi();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once on mount
+
+  return { state, refresh: fetchFromApi, isFromCache };
+}
 
 // ── D1 Schema hook ─────────────────────────────────────────────────────────────
 

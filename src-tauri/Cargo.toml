@@ -40,15 +40,12 @@ toml = "0.8"
 
 # HTTP client — rustls only, no OpenSSL dependency
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+urlencoding = "2"
+mime_guess = "2"
+chrono = "0.4"
 
 # Cross-platform home/config directory resolution
 dirs = "5"
 
 # Async runtime
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
-
-# AWS S3 SDK — used for Cloudflare R2 (S3-compatible) operations
-aws-sdk-s3 = { version = "1", features = ["behavior-version-latest"] }
-aws-config = { version = "1", features = ["behavior-version-latest"] }
-aws-credential-types = "1"
-aws-smithy-runtime-api = "1"
