@@ -84,8 +84,43 @@ jobs:
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
           git push origin main --tags
 
-  build:
+  create_release:
     needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ needs.version.outputs.new_version }}"
+          name: "CF Studio v${{ needs.version.outputs.new_version }}"
+          body: |
+            ## CF Studio v${{ needs.version.outputs.new_version }}
+
+            ### Downloads
+            | Platform | Architecture | File |
+            |----------|--------------|------|
+            | macOS | Apple Silicon (M1/M2/M3/M4) | `CF-Studio-*-apple_silicon.dmg` |
+            | macOS | Intel | `CF-Studio-*-intel_chip.dmg` |
+            | Windows | x64 | `CF-Studio-*-windows_x64.exe` |
+            | Linux | x86_64 | `CF-Studio-*-linux_x64.{deb,AppImage}` |
+            | Linux | ARM64 | `CF-Studio-*-linux_arm64.{deb,AppImage}` |
+
+            #### macOS Note
+            *You may need to run this command in your terminal after first open if getting any issue.* 
+            ```bash
+            xattr -cr /Applications/CF\ Studio.app
+            ```
+
+            #### Windows Note
+            *Windows SmartScreen may show a warning — click "More info" → "Run anyway" to proceed.*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+  build:
+    needs: [version, create_release]
     strategy:
       fail-fast: false
       matrix:
@@ -106,7 +141,7 @@ jobs:
             rust_target: x86_64-unknown-linux-gnu
             label: linux_x64
             bundle_type: deb
-          - runner: ubuntu-22.04-arm64
+          - runner: ubuntu-24.04-arm64
             rust_target: aarch64-unknown-linux-gnu
             label: linux_arm64
             bundle_type: deb
@@ -235,7 +270,18 @@ jobs:
             ${{ steps.linux_installer.outputs.appimage_path }}
           if-no-files-found: error
 
-  release:
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ needs.version.outputs.new_version }}"
+          files: |
+            ${{ steps.macos_installer.outputs.installer_path }}
+            ${{ steps.windows_installer.outputs.installer_path }}
+            ${{ steps.linux_installer.outputs.deb_path }}
+            ${{ steps.linux_installer.outputs.appimage_path }}
+
+
+  post_release:
     needs: [version, build]
     runs-on: ubuntu-latest
     permissions:
@@ -247,41 +293,6 @@ jobs:
           submodules: recursive
           token: ${{ secrets.SUBMODULE_PAT }}
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-          merge-multiple: true
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ needs.version.outputs.new_version }}"
-          name: "CF Studio v${{ needs.version.outputs.new_version }}"
-          body: |
-            ## CF Studio v${{ needs.version.outputs.new_version }}
-
-            ### Downloads
-            | Platform | Architecture | File |
-            |----------|--------------|------|
-            | macOS | Apple Silicon (M1/M2/M3/M4) | `CF-Studio-*-apple_silicon.dmg` |
-            | macOS | Intel | `CF-Studio-*-intel_chip.dmg` |
-            | Windows | x64 | `CF-Studio-*-windows_x64.exe` |
-            | Linux | x86_64 | `CF-Studio-*-linux_x64.{deb,AppImage}` |
-            | Linux | ARM64 | `CF-Studio-*-linux_arm64.{deb,AppImage}` |
-
-            #### macOS Note
-            *You may need to run this command in your terminal after first open if getting any issue.* 
-            ```bash
-            xattr -cr /Applications/CF\ Studio.app
-            ```
-
-            #### Windows Note
-            *Windows SmartScreen may show a warning — click "More info" → "Run anyway" to proceed.*
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          files: ./artifacts/*
 
       - name: Update static config version
         run: |
