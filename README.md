@@ -8,13 +8,41 @@ Managing Cloudflare Edge databases shouldn't require juggling CLI commands or wa
 
 The best part? **Zero configuration.** CF Studio automatically detects your local `wrangler` session. Open the app, and your databases are instantly available.
 
+## Installation
+
+Install the latest release of CF Studio with a single command:
+
+**macOS:**
+```bash
+curl -fsSL https://install.cfstudio.dev | bash
+```
+
+**Windows:**
+```powershell
+irm https://install.cfstudio.dev | iex
+```
+
 ## Features
 
-- **Zero-Touch Auth:** Automatically reads your local `wrangler` config. No manual API tokens or keys required.
-- **D1 Explorer:** View schemas, run SQL queries, and manage records in a responsive data grid.
-- **KV Manager:** Search, add, edit, and delete key-value pairs in real-time.
-- **Native Performance:** Built with Rust and Tauri v2 for minimal memory footprint and instant startup.
-- **Cross-Platform:** Native binaries for macOS, Windows, and Linux.
+### D1 Explorer
+View schemas, run SQL queries, and manage records in a responsive data grid.
+
+![D1 Database](screenshots/D1%20Database.png)
+
+### R2 Storage Explorer
+Manage your R2 buckets, upload files, and explore your objects.
+
+![R2 Buckets](screenshots/R2%20Buckets.png)
+![File Upload](screenshots/File%20Upload.png)
+
+### Zero-Touch Auth
+Automatically reads your local `wrangler` config. No manual API tokens or keys required.
+
+### KV Manager
+Search, add, edit, and delete key-value pairs in real-time.
+
+### Native Performance & Cross-Platform
+Built with Rust and Tauri v2 for minimal memory footprint and instant startup. Native binaries for macOS, Windows, and Linux.
 
 ## Tech Stack
 
