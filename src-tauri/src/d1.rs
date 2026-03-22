@@ -171,7 +171,7 @@ async fn execute_query(
     let resp: CfResponse<Vec<D1QueryResult>> = serde_json::from_str(&resp_text).map_err(|e| D1Error::Api(format!("Failed to parse response: {}. Body: {}", e, resp_text)))?;
 
     if !resp.success {
-        println!("DEBUG D1 QUERY FAILED: {:?}", resp.errors);
+
         return Err(D1Error::Api(api_errors_to_string(&resp.errors)));
     }
 
@@ -206,12 +206,12 @@ async fn fetch_table_metadata(
                     None
                 }).collect();
                 
-                println!("DEBUG [PRAGMA] Metadata for {}: {} tables", database_id, tables.len());
+
                 return Ok((tables.len() as u32, tables));
             }
         },
         Err(e) => {
-            println!("DEBUG [PRAGMA] FAILED for {}: {}", database_id, e);
+
         }
     }
 
@@ -247,7 +247,7 @@ pub async fn fetch_d1_databases() -> Result<Vec<D1Database>, D1Error> {
     };
 
     let mut databases = list_databases(&client, &account_id).await?;
-    println!("DEBUG D1 LIST SIZE: {}", databases.len());
+
 
     for db in &mut databases {
         // Run the metadata fetch if count is missing (None) or 0 (likely placeholder)
@@ -298,7 +298,7 @@ pub async fn execute_d1_query(
             )))
         })?;
 
-    println!("DEBUG D1 QUERY TOKEN: {:?}", creds.oauth_token);
+
 
     let client = CloudflareClient::new(&creds.oauth_token)?;
 

@@ -14,8 +14,10 @@ import {
 } from "lucide-react";
 import { QueryEditor } from "@/components/QueryEditor";
 import { SchemaVisualizer } from "@/components/SchemaVisualizer";
-import { IndexManagerDialog } from "@/components/IndexManagerDialog";
 import { useAppStore } from "@/store/useAppStore";
+import { useRemoteConfig } from "@/pro_modules/frontend/useRemoteConfig";
+import { PurchaseScreen } from "@/pro_modules/frontend/PurchaseScreen";
+import { IndexManagerDialog } from "@/pro_modules/frontend/IndexManagerDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -751,6 +753,8 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
   const [isVisualSchemaOpen, setIsVisualSchemaOpen] = useState(false);
   const [isQueryEditorOpen, setIsQueryEditorOpen] = useState(false);
   const [isIndexManagerOpen, setIsIndexManagerOpen] = useState(false);
+  const [showPurchaseScreen, setShowPurchaseScreen] = useState(false);
+  const { data: configData } = useRemoteConfig();
   const userPickedRef = useRef(false);          // true once user manually clicks a table
   const { state, refresh } = useD1Schema(database.uuid);
 
@@ -821,10 +825,21 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
           <Badge 
             variant="outline" 
             className="gap-1.5 ml-1.5 px-2 cursor-pointer hover:bg-muted font-medium text-[10px] uppercase tracking-wider shrink-0 transition-colors"
-            onClick={() => setIsIndexManagerOpen(true)}
+            onClick={() => {
+              if (configData?.enable_d1_index_management !== false) {
+                setIsIndexManagerOpen(true);
+              } else {
+                setShowPurchaseScreen(true);
+              }
+            }}
           >
             <Layers size={11} strokeWidth={2.5} />
             Indexes
+            {configData?.enable_d1_index_management === false && (
+              <Badge variant="secondary" className="ml-1 px-1 py-0 h-3.5 text-[8px] bg-primary/10 text-primary border-transparent">
+                PRO
+              </Badge>
+            )}
           </Badge>
         </div>
 
@@ -989,6 +1004,9 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
         onOpenChange={setIsIndexManagerOpen} 
         allTables={tables}
       />
+      {showPurchaseScreen && (
+        <PurchaseScreen onClose={() => setShowPurchaseScreen(false)} />
+      )}
     </div>
   );
 }
