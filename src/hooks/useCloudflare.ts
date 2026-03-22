@@ -349,6 +349,12 @@ export function setResolvedAccountId(id: string) {
   resolvedAccountId = id;
 }
 
+export interface D1Index {
+  name: string;
+  tableName: string;
+  sql: string | null;
+}
+
 // ── D1 Table Data hook ─────────────────────────────────────────────────────────
 
 
@@ -467,6 +473,63 @@ export function useD1TableData(
       setState({ status: "error", message: String(err) });
     }
   }, [databaseId, tableName, offset, sortCol, sortAsc, cacheKey]);
+
+  useEffect(() => {
+    fetch();
+  }, [fetch]);
+
+  return { state, refresh: () => fetch(true) };
+}
+
+/**
+ * Fetches all user-defined indexes for a D1 database.
+ */
+export function useD1Indexes(databaseId: string) {
+  const cacheKey = `indexes_${databaseId}`;
+  const [state, setState] = useState<AsyncState<D1Index[]>>(() => {
+    const cached = useAppStore.getState().queryCache[cacheKey];
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return { status: "success", data: cached.data };
+    }
+    return { status: "idle" };
+  });
+
+  const fetch = useCallback(async (force = false) => {
+    if (!databaseId) return;
+
+    if (!force) {
+      const cached = useAppStore.getState().queryCache[cacheKey];
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        setState({ status: "success", data: cached.data });
+        return;
+      }
+    }
+
+    setState({ status: "loading" });
+    try {
+      const accountId = resolvedAccountId;
+      const sql = "SELECT name, tbl_name as tableName, sql FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%' ORDER BY tbl_name, name;";
+      
+      const results = await invokeCloudflare<D1QueryResult[]>("execute_d1_query", {
+        accountId,
+        databaseId,
+        sqlQuery: sql,
+        params: null,
+      });
+
+      const rows = results[0]?.results ?? [];
+      const data: D1Index[] = rows.map(r => ({
+        name: String(r.name),
+        tableName: String(r.tableName),
+        sql: r.sql ? String(r.sql) : null,
+      }));
+
+      useAppStore.getState().setQueryCacheItem(cacheKey, data);
+      setState({ status: "success", data });
+    } catch (err) {
+      setState({ status: "error", message: String(err) });
+    }
+  }, [databaseId, cacheKey]);
 
   useEffect(() => {
     fetch();

@@ -9,10 +9,12 @@ import {
   ChevronRight, AlertCircle, BookOpen,
   ChevronLeft, ChevronRight as ChevronRightIcon,
   Sheet, Code2, Terminal, Network,
-  ChevronDown, ArrowUp, ArrowDown, Copy, Edit, Trash2, Download, Link2, Key
+  ChevronDown, ArrowUp, ArrowDown, Copy, Edit, Trash2, Download, Link2, Key,
+  Layers
 } from "lucide-react";
 import { QueryEditor } from "@/components/QueryEditor";
 import { SchemaVisualizer } from "@/components/SchemaVisualizer";
+import { IndexManagerDialog } from "@/components/IndexManagerDialog";
 import { useAppStore } from "@/store/useAppStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -748,6 +750,7 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
   const [systemOpen, setSystemOpen] = useState(false);
   const [isVisualSchemaOpen, setIsVisualSchemaOpen] = useState(false);
   const [isQueryEditorOpen, setIsQueryEditorOpen] = useState(false);
+  const [isIndexManagerOpen, setIsIndexManagerOpen] = useState(false);
   const userPickedRef = useRef(false);          // true once user manually clicks a table
   const { state, refresh } = useD1Schema(database.uuid);
 
@@ -814,6 +817,14 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
           >
             <Network size={11} strokeWidth={2.5} />
             Visual Schema
+          </Badge>
+          <Badge 
+            variant="outline" 
+            className="gap-1.5 ml-1.5 px-2 cursor-pointer hover:bg-muted font-medium text-[10px] uppercase tracking-wider shrink-0 transition-colors"
+            onClick={() => setIsIndexManagerOpen(true)}
+          >
+            <Layers size={11} strokeWidth={2.5} />
+            Indexes
           </Badge>
         </div>
 
@@ -972,6 +983,12 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
           </div>
         </DialogContent>
       </Dialog>
+      <IndexManagerDialog 
+        databaseId={database.uuid} 
+        open={isIndexManagerOpen} 
+        onOpenChange={setIsIndexManagerOpen} 
+        allTables={tables}
+      />
     </div>
   );
 }
