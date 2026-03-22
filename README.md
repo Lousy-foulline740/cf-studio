@@ -1,84 +1,106 @@
 # CF Studio
 
-A blazing-fast, native desktop client for Cloudflare D1 and KV.
+A blazing-fast, native desktop client for Cloudflare D1 and R2.
 
 [Website](https://cfstudio.dev) • [Portfolio](https://mubashar.dev) • [YouTube](https://youtube.com/@mubashardev)
 
-Managing Cloudflare Edge databases shouldn't require juggling CLI commands or waiting for web dashboards to load. CF Studio provides a sleek, native GUI to manage your D1 databases and KV namespaces directly from your desktop.
+Managing Cloudflare Edge databases and storage shouldn't require juggling CLI commands or waiting for web dashboards to load. CF Studio provides a sleek, native GUI to manage your D1 databases and R2 buckets directly from your desktop.
 
-The best part? **Zero configuration.** CF Studio automatically detects your local `wrangler` session. Open the app, and your databases are instantly available.
+The best part? **Zero configuration.** CF Studio automatically detects your local `wrangler` session. Open the app, and your resources are instantly available.
 
-## Installation
+---
 
-Install the latest release of CF Studio with a single command:
-
-**macOS:**
-```bash
-curl -fsSL https://install.cfstudio.dev | bash
-```
-
-**Windows:**
-```powershell
-irm https://install.cfstudio.dev | iex
-```
-
-![Terminal Installer](screenshots/Terminal%20Look.png)
-
-## Features
-
-### D1 Explorer
-View schemas, run SQL queries, and manage records in a responsive data grid.
-
-![D1 Database](screenshots/D1%20Database.png)
+## Features Overview
 
 ### R2 Storage Explorer
-Manage your R2 buckets, upload files, and explore your objects.
+Complete management of your Cloudflare R2 buckets. Upload, download, and explore your objects with ease.
 
-![R2 Buckets](screenshots/R2%20Buckets.png)
-![File Upload](screenshots/File%20Upload.png)
+<div align="center">
+  <img src="screenshots/1. R2 Buckets Dark.png" width="800" alt="R2 Buckets List" />
+  <p><em>R2 Buckets Management interface</em></p>
+</div>
 
-### Zero-Touch Auth
-Automatically reads your local `wrangler` config. No manual API tokens or keys required.
+#### Bucket Details & File Uploads
+Drill down into any bucket to manage its contents via a native file-explorer experience.
 
-### KV Manager
-Search, add, edit, and delete key-value pairs in real-time.
+<div align="center">
+  <img src="screenshots/1.1. Bucket Details Dark.png" width="400" />
+  <img src="screenshots/1.2. File Upload Dark.png" width="400" />
+</div>
 
-### Native Performance & Cross-Platform
-Built with Rust and Tauri v2 for minimal memory footprint and instant startup. Native binaries for macOS, Windows, and Linux.
+---
+
+### D1 Database Management
+Explore your D1 databases with an intuitive listing and detailed table inspector.
+
+<div align="center">
+  <img src="screenshots/2. D1 Databases List Dark.png" width="450" />
+  <img src="screenshots/2.1. Database Details Dark.png" width="450" />
+</div>
+
+#### Interactive SQL Editor
+Run complex queries with a context-aware SQL editor. It suggests table names and columns from your actual schema as you type.
+
+<div align="center">
+  <img src="screenshots/2.2. DB SQL Editor Dark.png" width="800" alt="SQL Editor" />
+</div>
+
+#### Visual Schema (ER Diagram)
+Visualize your database architecture instantly. The interactive ER diagram maps out table relationships and foreign key constraints.
+
+<div align="center">
+  <img src="screenshots/2.3. DB Visual Schema Dark.png" width="800" alt="Visual Schema" />
+</div>
+
+#### Index Management
+Manage your database performance with interactive index management. Create and delete indexes without writing a single line of SQL.
+
+<div align="center">
+  <img src="screenshots/2.4. DB Indexes Dark.png" width="450" />
+  <img src="screenshots/2.5. New Index Rows Estimate Dark.png" width="450" />
+</div>
+
+*Features a **One-time rows read estimate** to prevent heavy performance hits on production databases.*
+
+---
+
+## Core Capabilities
+
+CF Studio includes high-tier features for comprehensive management:
+- **Bulk Data Export**: Export table data instantly to multiple formats.
+- **R2 Bucket Creation & Deletion**: Create and manage R2 buckets natively.
+- **Advanced Indexing**: Full interactive control over D1 indexes.
 
 ## Tech Stack
 
 - **Frontend:** React, Vite, TypeScript
 - **Backend:** Rust, Tauri v2
-- **UI & Styling:** Tailwind CSS, shadcn/ui
+- **UI & Styling:** Tailwind CSS v4, shadcn/ui
 - **Package Manager:** Bun
-- **Local State:** SQLite (via sqlx)
+- **Local State:** SQLite
 
 ## Getting Started
 
 ### Prerequisites
 
-Ensure you have the following installed on your system:
 - [Bun](https://bun.sh/)
 - [Rust](https://www.rust-lang.org/tools/install)
-- Cloudflare Wrangler CLI (Authenticated via `wrangler login`)
+- Cloudflare Wrangler CLI (`wrangler login`)
 
 ### Local Development
 
 1. Clone the repository:
     ```bash
-    git clone [https://github.com/mubashardev/cf-studio.git](https://github.com/mubashardev/cf-studio.git)
+    git clone https://github.com/mubashardev/cf-studio.git
     cd cf-studio
     ```
 
-2.  Install dependencies:
-
+2. Install dependencies:
     ```bash
     bun install
     ```
 
-3.  Start the development server:
-
+3. Start the development server:
     ```bash
     bun tauri dev
     ```
@@ -86,23 +108,22 @@ Ensure you have the following installed on your system:
 ## Roadmap
 
 - [x] Initial UI shell and OKLCH theme system
-- [x] Wrangler auto-authentication & session logic
-- [x] D1 database listing and data grid viewer
-- [x] SQL query execution engine
-- [x] Interactive Visual Schema (ER Diagram)
-- [x] Bulk D1 data Export
+- [x] Wrangler auto-authentication
+- [x] D1 database listing & data grid
+- [x] Interactive SQL query engine
+- [x] Visual Schema (ER Diagram)
 - [x] R2 Storage Explorer
+- [x] Bulk D1 data Export
+- [x] Interactive Index Management
 - [ ] KV namespace CRUD operations
-- More features coming soon
-
 
 ## Contributing
 
-Contributions are always welcome. If you want to add a new feature or fix a bug, please open an issue first to discuss the proposed changes.
+Contributions are welcome! Please open an issue first to discuss any major changes.
 
 ## License
 
-[MIT](https://www.google.com/search?q=LICENSE)
+[MIT](LICENSE)
 
 -----
 
