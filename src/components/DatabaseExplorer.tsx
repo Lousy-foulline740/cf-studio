@@ -190,12 +190,16 @@ function DataTab({ databaseId, table, allTables, onTableSelect }: DataTabProps) 
   const privacySettings = useAppStore(s => s.privacySettings);
   const blurTable = privacySettings.enabled && privacySettings.tableNames;
   const [offset, setOffset] = useState(0);
+  const [pageSize, setPageSize] = useState(100);
+  const [isCustomLimitOpen, setIsCustomLimitOpen] = useState(false);
+  const [customLimitInput, setCustomLimitInput] = useState("1000");
+
   const [editingColumn, setEditingColumn] = useState<D1Column | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [selectedRowIndices, setSelectedRowIndices] = useState<number[]>([]);
   const [sortCol, setSortCol] = useState<string | undefined>();
   const [sortAsc, setSortAsc] = useState<boolean | undefined>();
-  const { state, refresh } = useD1TableData(databaseId, table.name, offset, sortCol, sortAsc);
+  const { state, refresh } = useD1TableData(databaseId, table.name, offset, pageSize, sortCol, sortAsc);
 
   const [incomingFks, setIncomingFks] = useState<{fromTable: string, fromColumn: string, toColumn: string}[]>([]);
 
@@ -225,8 +229,8 @@ function DataTab({ databaseId, table, allTables, onTableSelect }: DataTabProps) 
     setIncomingFks(incoming);
   }, [allTables, table.name]);
 
-  const page = Math.floor(offset / 100) + 1;
-  const hasNext = state.status === "success" && state.data.totalFetched === 100;
+  const page = Math.floor(offset / pageSize) + 1;
+  const hasNext = state.status === "success" && state.data.totalFetched === pageSize;
   const hasPrev = offset > 0;
 
   const tableDensity = useAppStore(s => s.tableDensity);
@@ -566,11 +570,50 @@ function DataTab({ databaseId, table, allTables, onTableSelect }: DataTabProps) 
       {/* Pagination footer */}
       {(hasPrev || hasNext || state.status === "success") && (
         <div className="flex items-center justify-between border-t border-border bg-muted/20 px-4 py-2 shrink-0">
-          <span className="text-xs text-muted-foreground/50 tabular-nums">
-            {state.status === "success"
-              ? `Rows ${offset + 1}–${offset + (state.data?.totalFetched ?? 0)}`
-              : "Loading…"}
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-muted-foreground/50 tabular-nums">
+              {state.status === "success"
+                ? `Rows ${offset + 1}–${offset + (state.data?.totalFetched ?? 0)}`
+                : "Loading…"}
+            </span>
+
+            <div className="flex items-center gap-1.5 h-4 ml-2 pl-4 border-l border-border/50">
+              <span className="text-[10px] text-muted-foreground/30 uppercase tracking-tight font-sans">Per page</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs font-mono text-muted-foreground hover:text-foreground hover:bg-muted/50 gap-1">
+                    {pageSize >= 1000000 ? "All" : pageSize}
+                    <ChevronDown size={10} className="opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-32 font-mono text-xs shadow-lg border-border/60">
+                  {[50, 100, 500].map(size => (
+                    <DropdownMenuItem 
+                      key={size} 
+                      className={cn("cursor-pointer", pageSize === size && "bg-accent text-accent-foreground")}
+                      onClick={() => { setPageSize(size); setOffset(0); }}
+                    >
+                      {size}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuItem 
+                    className={cn("cursor-pointer", pageSize >= 1000000 && "bg-accent text-accent-foreground")}
+                    onClick={() => { setPageSize(1000000); setOffset(0); }}
+                  >
+                    All
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="cursor-pointer gap-2"
+                    onClick={() => setIsCustomLimitOpen(true)}
+                  >
+                    <Edit size={11} className="opacity-50" /> Custom...
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground/40">Page {page}</span>
             <div className="flex items-center gap-1">
@@ -578,7 +621,7 @@ function DataTab({ databaseId, table, allTables, onTableSelect }: DataTabProps) 
                 variant="outline" size="icon"
                 className="h-6 w-6"
                 disabled={!hasPrev}
-                onClick={() => setOffset(Math.max(0, offset - 100))}
+                onClick={() => setOffset(Math.max(0, offset - pageSize))}
                 aria-label="Previous page"
               >
                 <ChevronLeft size={12} />
@@ -587,7 +630,7 @@ function DataTab({ databaseId, table, allTables, onTableSelect }: DataTabProps) 
                 variant="outline" size="icon"
                 className="h-6 w-6"
                 disabled={!hasNext}
-                onClick={() => setOffset(offset + 100)}
+                onClick={() => setOffset(offset + pageSize)}
                 aria-label="Next page"
               >
                 <ChevronRightIcon size={12} />
@@ -596,6 +639,54 @@ function DataTab({ databaseId, table, allTables, onTableSelect }: DataTabProps) 
           </div>
         </div>
       )}
+
+      {/* Custom page size dialog */}
+      <Dialog open={isCustomLimitOpen} onOpenChange={setIsCustomLimitOpen}>
+        <DialogContent className="sm:max-w-[300px] border-border/60 shadow-2xl">
+          <DialogTitle className="text-sm font-semibold">Custom Rows Per Page</DialogTitle>
+          <div className="py-2 space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase font-sans tracking-widest text-muted-foreground/60">Limit (max 10000)</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={customLimitInput}
+                  onChange={(e) => setCustomLimitInput(e.target.value)}
+                  className="w-full bg-muted/30 border border-border/60 rounded-md px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                  placeholder="1000"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = parseInt(customLimitInput);
+                      if (!isNaN(val) && val > 0) {
+                        setPageSize(Math.min(val, 10000));
+                        setOffset(0);
+                        setIsCustomLimitOpen(false);
+                      }
+                    }
+                  }}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/40 font-mono">
+                  ROWS
+                </div>
+              </div>
+            </div>
+            <Button 
+              className="w-full h-8 text-xs font-medium"
+              onClick={() => {
+                const val = parseInt(customLimitInput);
+                if (!isNaN(val) && val > 0) {
+                  setPageSize(Math.min(val, 10000));
+                  setOffset(0);
+                  setIsCustomLimitOpen(false);
+                }
+              }}
+            >
+              Apply Limit
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -610,6 +701,7 @@ function TableListItem({
   onClick: () => void;
 }) {
   const privacySettings = useAppStore((s) => s.privacySettings);
+  const showTableColumnCounts = useAppStore((s) => s.showTableColumnCounts);
   const blurTable = privacySettings.enabled && privacySettings.tableNames;
 
   return (
@@ -631,7 +723,7 @@ function TableListItem({
         "flex-1 truncate",
         blurTable && "blur-[4px] hover:blur-none transition-all duration-200 select-none hover:select-auto cursor-default"
       )}>{table.name}</span>
-      {table.columnsCount !== undefined && (
+      {showTableColumnCounts && table.columnsCount !== undefined && (
         <Badge 
           variant="secondary" 
           className="px-1.5 py-0 h-4 text-[9px] font-mono shrink-0 bg-muted/40 text-muted-foreground/40 group-hover:bg-muted group-hover:text-muted-foreground transition-colors"

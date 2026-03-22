@@ -61,6 +61,7 @@ interface AppState {
 
   // ── Preferences ──
   tableDensity: "compact" | "comfortable";
+  showTableColumnCounts: boolean;
   isRefreshingSession: boolean;
   privacySettings: PrivacySettings;
 
@@ -84,6 +85,7 @@ interface AppState {
   setActiveAccount: (account: CloudflareAccount | null) => void;
   setTableDensity: (density: "compact" | "comfortable") => void;
   setIsRefreshingSession: (isRefreshing: boolean) => void;
+  setShowTableColumnCounts: (show: boolean) => void;
   setPrivacySettings: (settings: Partial<PrivacySettings>) => void;
 
   /** Overwrite the databases list and stamp the fetch time. */
@@ -120,6 +122,7 @@ export const useAppStore = create<AppState>()(
       kvNamespaces: [],
       r2Buckets: [],
       tableDensity: "comfortable",
+      showTableColumnCounts: true,
       isRefreshingSession: false,
       privacySettings: {
         enabled: false,
@@ -142,6 +145,7 @@ export const useAppStore = create<AppState>()(
       setActiveAccount: (account) => set({ activeAccount: account }),
       setTableDensity: (density) => set({ tableDensity: density }),
       setIsRefreshingSession: (b) => set({ isRefreshingSession: b }),
+      setShowTableColumnCounts: (show) => set({ showTableColumnCounts: show }),
       setPrivacySettings: (settings) => set((s) => ({ privacySettings: { ...s.privacySettings, ...settings } })),
       setDatabases: (databases) =>
         set({ databases, lastFetched: Date.now() }),

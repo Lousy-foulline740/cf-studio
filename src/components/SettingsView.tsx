@@ -22,6 +22,8 @@ export function SettingsView() {
   const setCloudflareAccountId = useAppStore(s => s.setCloudflareAccountId);
   const privacySettings = useAppStore(s => s.privacySettings);
   const setPrivacySettings = useAppStore(s => s.setPrivacySettings);
+  const showTableColumnCounts = useAppStore(s => s.showTableColumnCounts);
+  const setShowTableColumnCounts = useAppStore(s => s.setShowTableColumnCounts);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefreshConnection = async () => {
@@ -141,6 +143,20 @@ export function SettingsView() {
                         <span className="text-xs">{desc}</span>
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                {/* Table Metadata */}
+                <div className="space-y-4 pt-2 border-t border-border/50">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-sm font-medium">Show Table Column Counts</Label>
+                      <p className="text-xs text-muted-foreground italic">Display "X cols" chips in the table navigation sidebar</p>
+                    </div>
+                    <Switch 
+                      checked={showTableColumnCounts} 
+                      onCheckedChange={(checked) => setShowTableColumnCounts(!!checked)} 
+                    />
                   </div>
                 </div>
 

@@ -351,7 +351,7 @@ export function setResolvedAccountId(id: string) {
 
 // ── D1 Table Data hook ─────────────────────────────────────────────────────────
 
-const PAGE_LIMIT = 100;
+
 
 export interface D1ForeignKey {
   table: string;
@@ -386,10 +386,11 @@ export function useD1TableData(
   databaseId: string,
   tableName: string,
   offset: number = 0,
+  limit: number = 100,
   sortCol?: string,
   sortAsc?: boolean
 ) {
-  const cacheKey = `data_${databaseId}_${tableName}_${offset}_${sortCol}_${sortAsc}`;
+  const cacheKey = `data_${databaseId}_${tableName}_${offset}_${limit}_${sortCol}_${sortAsc}`;
   const [state, setState] = useState<AsyncState<D1TableData>>(() => {
     const cached = useAppStore.getState().queryCache[cacheKey];
     if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -416,7 +417,7 @@ export function useD1TableData(
       if (sortCol) {
         orderClause = ` ORDER BY "${sortCol}" ${sortAsc ? 'ASC' : 'DESC'}`;
       }
-      const sql = `PRAGMA table_info("${tableName}"); PRAGMA foreign_key_list("${tableName}"); SELECT * FROM "${tableName}"${orderClause} LIMIT ${PAGE_LIMIT} OFFSET ${offset};`;
+      const sql = `PRAGMA table_info("${tableName}"); PRAGMA foreign_key_list("${tableName}"); SELECT * FROM "${tableName}"${orderClause} LIMIT ${limit} OFFSET ${offset};`;
 
       const queryResults = await invokeCloudflare<D1QueryResult[]>("execute_d1_query", {
         accountId,
@@ -455,7 +456,7 @@ export function useD1TableData(
         Object.keys(dataRows[0]).forEach(k => columns.push({ name: k, type: "unknown" }));
       }
 
-      const resultData = { columns, rows: dataRows, totalFetched: dataRows.length, offset, limit: PAGE_LIMIT };
+      const resultData = { columns, rows: dataRows, totalFetched: dataRows.length, offset, limit };
       useAppStore.getState().setQueryCacheItem(cacheKey, resultData);
       
       setState({
