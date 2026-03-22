@@ -128,6 +128,9 @@ function TableListSkeleton() {
 // ── Schema tab content ────────────────────────────────────────────────────────
 
 function SchemaTab({ table }: { table: D1TableSchema }) {
+  const privacySettings = useAppStore(s => s.privacySettings);
+  const blurTable = privacySettings.enabled && privacySettings.tableNames;
+
   if (!table.sql) {
     return (
       <PanelMessage
@@ -142,7 +145,7 @@ function SchemaTab({ table }: { table: D1TableSchema }) {
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0 bg-muted/20">
         <div className="flex items-center gap-2">
           <Code2 size={13} strokeWidth={1.75} className="text-primary" />
-          <span className="text-xs font-medium text-foreground">{table.name}</span>
+          <span className={cn("text-xs font-medium text-foreground", blurTable && "blur-[4px] hover:blur-none transition-all duration-200 select-none hover:select-auto cursor-default")}>{table.name}</span>
         </div>
         <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wider">CREATE TABLE</span>
       </div>
@@ -184,6 +187,8 @@ interface DataTabProps {
 }
 
 function DataTab({ databaseId, table, allTables, onTableSelect }: DataTabProps) {
+  const privacySettings = useAppStore(s => s.privacySettings);
+  const blurTable = privacySettings.enabled && privacySettings.tableNames;
   const [offset, setOffset] = useState(0);
   const [editingColumn, setEditingColumn] = useState<D1Column | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -253,7 +258,7 @@ function DataTab({ databaseId, table, allTables, onTableSelect }: DataTabProps) 
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0 bg-muted/20">
         <div className="flex items-center gap-2">
           <Sheet size={13} strokeWidth={1.75} className="text-primary" />
-          <span className="text-xs font-medium text-foreground">{table.name}</span>
+          <span className={cn("text-xs font-medium text-foreground", blurTable && "blur-[4px] hover:blur-none transition-all duration-200 select-none hover:select-auto cursor-default")}>{table.name}</span>
           {state.status === "success" && (
             <Badge variant="secondary" className="text-[10px] font-mono">
               {state.data.rows.length} row{state.data.rows.length !== 1 ? "s" : ""}
@@ -576,6 +581,9 @@ function TableListItem({
   active: boolean;
   onClick: () => void;
 }) {
+  const privacySettings = useAppStore((s) => s.privacySettings);
+  const blurTable = privacySettings.enabled && privacySettings.tableNames;
+
   return (
     <button
       onClick={onClick}
@@ -591,7 +599,10 @@ function TableListItem({
         size={13} strokeWidth={active ? 2 : 1.75}
         className={cn("shrink-0", active ? "text-primary" : "text-muted-foreground/50")}
       />
-      <span className="flex-1 truncate">{table.name}</span>
+      <span className={cn(
+        "flex-1 truncate",
+        blurTable && "blur-[4px] hover:blur-none transition-all duration-200 select-none hover:select-auto cursor-default"
+      )}>{table.name}</span>
       {active && <ChevronRight size={12} className="text-primary shrink-0" />}
     </button>
   );
@@ -611,6 +622,9 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
   const [isQueryEditorOpen, setIsQueryEditorOpen] = useState(false);
   const userPickedRef = useRef(false);          // true once user manually clicks a table
   const { state, refresh } = useD1Schema(database.uuid);
+
+  const privacySettings = useAppStore((s) => s.privacySettings);
+  const blurDb = privacySettings.enabled && privacySettings.databaseNames;
 
   const isLoading = state.status === "idle" || state.status === "loading";
   const allTables  = state.status === "success" ? state.data : [];
@@ -651,7 +665,7 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
 
         <div className="flex items-center gap-2 min-w-0">
           <Database size={14} strokeWidth={1.75} className="text-primary shrink-0" />
-          <span className="font-semibold text-sm text-foreground truncate">{database.name}</span>
+          <span className={cn("font-semibold text-sm text-foreground truncate", blurDb && "blur-[4px] hover:blur-none transition-all duration-200 select-none hover:select-auto cursor-default")}>{database.name}</span>
           {database.version && (
             <Badge variant="secondary" className="font-mono text-[10px] uppercase shrink-0">
               {database.version}
@@ -810,7 +824,7 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
           <DialogTitle className="sr-only">Visual Schema</DialogTitle>
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/10 shrink-0">
             <Network size={16} className="text-primary" />
-            <span className="font-semibold text-sm">Visual Schema — {database.name}</span>
+            <span className="font-semibold text-sm">Visual Schema — <span className={cn(blurDb && "blur-[4px] hover:blur-none transition-all duration-200 select-none hover:select-auto cursor-default")}>{database.name}</span></span>
           </div>
           <div className="flex-1 min-h-0 relative">
             <SchemaVisualizer tables={tables} />
@@ -823,7 +837,7 @@ export function DatabaseExplorer({ database, onBack }: DatabaseExplorerProps) {
           <DialogTitle className="sr-only">SQL Editor</DialogTitle>
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/10 shrink-0">
             <Terminal size={16} className="text-primary" />
-            <span className="font-semibold text-sm">SQL Editor — {database.name}</span>
+            <span className="font-semibold text-sm">SQL Editor — <span className={cn(blurDb && "blur-[4px] hover:blur-none transition-all duration-200 select-none hover:select-auto cursor-default")}>{database.name}</span></span>
           </div>
           <div className="flex-1 min-h-0 relative flex flex-col">
             <QueryEditor databaseId={database.uuid} tables={allTables} />

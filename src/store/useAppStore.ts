@@ -19,6 +19,16 @@ export interface UserProfile {
   last_name?: string | null;
 }
 
+export interface PrivacySettings {
+  enabled: boolean;
+  accountInfo: boolean;
+  databaseNames: boolean;
+  databaseIds: boolean;
+  tableNames: boolean;
+  r2BucketNames: boolean;
+  r2FileNames: boolean;
+}
+
 // ── KV placeholder type (populated in a future step) ─────────────────────────
 
 export interface KVNamespace {
@@ -52,6 +62,7 @@ interface AppState {
   // ── Preferences ──
   tableDensity: "compact" | "comfortable";
   isRefreshingSession: boolean;
+  privacySettings: PrivacySettings;
 
   /** Unix timestamp (ms) of the last successful databases fetch, or null. */
   lastFetched: number | null;
@@ -73,6 +84,7 @@ interface AppState {
   setActiveAccount: (account: CloudflareAccount | null) => void;
   setTableDensity: (density: "compact" | "comfortable") => void;
   setIsRefreshingSession: (isRefreshing: boolean) => void;
+  setPrivacySettings: (settings: Partial<PrivacySettings>) => void;
 
   /** Overwrite the databases list and stamp the fetch time. */
   setDatabases: (databases: D1Database[]) => void;
@@ -109,6 +121,15 @@ export const useAppStore = create<AppState>()(
       r2Buckets: [],
       tableDensity: "comfortable",
       isRefreshingSession: false,
+      privacySettings: {
+        enabled: false,
+        accountInfo: true,
+        databaseNames: true,
+        databaseIds: true,
+        tableNames: true,
+        r2BucketNames: true,
+        r2FileNames: true,
+      },
       lastFetched: null,
       kvLastFetched: null,
       r2LastFetched: null,
@@ -121,6 +142,7 @@ export const useAppStore = create<AppState>()(
       setActiveAccount: (account) => set({ activeAccount: account }),
       setTableDensity: (density) => set({ tableDensity: density }),
       setIsRefreshingSession: (b) => set({ isRefreshingSession: b }),
+      setPrivacySettings: (settings) => set((s) => ({ privacySettings: { ...s.privacySettings, ...settings } })),
       setDatabases: (databases) =>
         set({ databases, lastFetched: Date.now() }),
 
@@ -173,6 +195,7 @@ export const useAppStore = create<AppState>()(
         accounts: state.accounts,
         activeAccount: state.activeAccount,
         tableDensity: state.tableDensity,
+        privacySettings: state.privacySettings,
         databases: state.databases,
         kvNamespaces: state.kvNamespaces,
         r2Buckets: state.r2Buckets,

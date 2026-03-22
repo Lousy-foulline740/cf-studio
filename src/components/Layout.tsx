@@ -117,6 +117,7 @@ function Sidebar({
   activeAccount,
 }: SidebarProps) {
   const { theme, setTheme } = useTheme();
+  const privacySettings = useAppStore(s => s.privacySettings);
 
   return (
     <aside
@@ -204,21 +205,26 @@ function Sidebar({
       </nav>
 
       {/* User Profile */}
-      {!collapsed && activeAccount && (
-        <div className="px-3 py-3 border-t border-sidebar-border shrink-0 flex items-center gap-2.5 bg-sidebar-accent/10">
-          <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs shrink-0 uppercase tracking-tight">
-            {(activeAccount.name.trim().charAt(0) || "?").toUpperCase()}
+      {!collapsed && activeAccount && (() => {
+        const blurAccount = privacySettings.enabled && privacySettings.accountInfo;
+        const blurClass = "blur-[4px] hover:blur-none transition-all duration-200 select-none hover:select-auto cursor-default";
+        
+        return (
+          <div className="px-3 py-3 border-t border-sidebar-border shrink-0 flex items-center gap-2.5 bg-sidebar-accent/10">
+            <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs shrink-0 uppercase tracking-tight">
+              {(activeAccount.name.trim().charAt(0) || "?").toUpperCase()}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className={cn("text-sm font-medium text-sidebar-foreground leading-tight truncate", blurAccount && blurClass)}>
+                {activeAccount.name}
+              </span>
+              <span className={cn("text-[10px] text-sidebar-foreground/50 leading-tight truncate", blurAccount && blurClass)}>
+                {userProfile?.email ?? ""}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-medium text-sidebar-foreground leading-tight truncate">
-              {activeAccount.name}
-            </span>
-            <span className="text-[10px] text-sidebar-foreground/50 leading-tight truncate">
-              {userProfile?.email ?? ""}
-            </span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Theme Switcher */}
       {!collapsed && (

@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Monitor, Moon, RefreshCw, Sun, ExternalLink } from "lucide-react";
 import appVersion from "../../package.json";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export function SettingsView() {
   const { theme, setTheme } = useTheme();
@@ -18,6 +20,8 @@ export function SettingsView() {
   const tableDensity = useAppStore(s => s.tableDensity);
   const setTableDensity = useAppStore(s => s.setTableDensity);
   const setCloudflareAccountId = useAppStore(s => s.setCloudflareAccountId);
+  const privacySettings = useAppStore(s => s.privacySettings);
+  const setPrivacySettings = useAppStore(s => s.setPrivacySettings);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefreshConnection = async () => {
@@ -138,6 +142,73 @@ export function SettingsView() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Privacy Mode */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-base">Privacy Mode</Label>
+                      <p className="text-xs text-muted-foreground">Blur sensitive information. Hover to reveal.</p>
+                    </div>
+                    <Switch 
+                      checked={privacySettings.enabled} 
+                      onCheckedChange={(c) => setPrivacySettings({ enabled: c })} 
+                    />
+                  </div>
+                  
+                  {privacySettings.enabled && (
+                    <div className="pl-6 space-y-3 border-l-2 border-primary/20 animate-in fade-in slide-in-from-top-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="privacy-account" 
+                          checked={privacySettings.accountInfo}
+                          onCheckedChange={(c) => setPrivacySettings({ accountInfo: !!c })} 
+                        />
+                        <Label htmlFor="privacy-account" className="font-normal cursor-pointer">Account Name & Email</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="privacy-db" 
+                          checked={privacySettings.databaseNames}
+                          onCheckedChange={(c) => setPrivacySettings({ databaseNames: !!c })} 
+                        />
+                        <Label htmlFor="privacy-db" className="font-normal cursor-pointer">Database Names</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="privacy-db-id" 
+                          checked={privacySettings.databaseIds}
+                          onCheckedChange={(c) => setPrivacySettings({ databaseIds: !!c })} 
+                        />
+                        <Label htmlFor="privacy-db-id" className="font-normal cursor-pointer">Database IDs</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="privacy-tables" 
+                          checked={privacySettings.tableNames}
+                          onCheckedChange={(c) => setPrivacySettings({ tableNames: !!c })} 
+                        />
+                        <Label htmlFor="privacy-tables" className="font-normal cursor-pointer">Table Names</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="privacy-buckets" 
+                          checked={privacySettings.r2BucketNames}
+                          onCheckedChange={(c) => setPrivacySettings({ r2BucketNames: !!c })} 
+                        />
+                        <Label htmlFor="privacy-buckets" className="font-normal cursor-pointer">R2 Bucket Names</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="privacy-files" 
+                          checked={privacySettings.r2FileNames}
+                          onCheckedChange={(c) => setPrivacySettings({ r2FileNames: !!c })} 
+                        />
+                        <Label htmlFor="privacy-files" className="font-normal cursor-pointer">R2 File/Object Names</Label>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

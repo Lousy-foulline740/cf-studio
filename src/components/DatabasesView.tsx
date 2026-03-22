@@ -228,6 +228,9 @@ interface DatabaseRowProps {
 }
 
 function DatabaseRow({ db, onClick }: DatabaseRowProps) {
+  const privacySettings = useAppStore(s => s.privacySettings);
+  const blurDb = privacySettings.enabled && privacySettings.databaseNames;
+
   return (
     <TableRow
       onClick={() => onClick(db)}
@@ -237,13 +240,21 @@ function DatabaseRow({ db, onClick }: DatabaseRowProps) {
       <TableCell className="font-medium text-foreground py-3.5">
         <div className="flex items-center gap-2">
           <Database size={13} strokeWidth={1.75} className="text-primary shrink-0" />
-          <span className="truncate max-w-[200px]">{db.name}</span>
+          <span className={cn(
+            "truncate max-w-[200px]", 
+            blurDb && "blur-[4px] hover:blur-none transition-all duration-200 select-none hover:select-auto cursor-default"
+          )}>
+            {db.name}
+          </span>
         </div>
       </TableCell>
 
       {/* ID */}
       <TableCell className="py-3.5">
-        <code className="text-xs bg-muted/60 px-2 py-0.5 rounded font-mono text-muted-foreground select-text">
+        <code className={cn(
+          "text-xs bg-muted/60 px-2 py-0.5 rounded font-mono text-muted-foreground select-text",
+          privacySettings.enabled && privacySettings.databaseIds && "blur-[4px] hover:blur-none transition-all duration-200 select-none hover:select-auto cursor-default"
+        )}>
           {db.uuid}
         </code>
       </TableCell>
