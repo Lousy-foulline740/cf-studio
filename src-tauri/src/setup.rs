@@ -182,23 +182,32 @@ pub async fn install_dependencies(app: AppHandle) -> Result<(), SetupError> {
             run_shell("winget install OpenJS.NodeJS --silent --accept-package-agreements --accept-source-agreements").await?;
         }
 
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(target_os = "linux")]
+        {
+            emit_progress(&app, "Automatic Node.js installation is not yet supported on Linux.", 0);
+            emit_progress(&app, "Please install Node.js (e.g., `sudo apt install nodejs`) and restart.", 0);
+            return Err(SetupError::UnsupportedOs);
+        }
+
+        #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
         {
             emit_progress(&app, "Automatic Node.js installation is not supported on this OS.", 0);
             return Err(SetupError::UnsupportedOs);
         }
 
-        // Verify npm is now available
-        emit_progress(&app, "Verifying npm installation…", 50);
-        if !is_available("npm").await {
-            emit_progress(&app, "Error: npm is still not found after installing Node.js.", 0);
-            return Err(SetupError::Command(
-                "npm was not found after Node.js installation. You may need to restart the app."
-                    .into(),
-            ));
+        // Verify npm is now available (only reachable on macOS/Windows after installation attempts)
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        {
+            emit_progress(&app, "Verifying npm installation…", 50);
+            if !is_available("npm").await {
+                emit_progress(&app, "Error: npm is still not found after installing Node.js.", 0);
+                return Err(SetupError::Command(
+                    "npm was not found after Node.js installation. You may need to restart the app."
+                        .into(),
+                ));
+            }
+            emit_progress(&app, "Node.js installed successfully!", 55);
         }
-
-        emit_progress(&app, "Node.js installed successfully!", 55);
     } else {
         emit_progress(&app, "Node.js is already installed.", 55);
     }
