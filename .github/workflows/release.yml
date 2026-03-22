@@ -102,6 +102,14 @@ jobs:
             rust_target: x86_64-pc-windows-msvc
             label: windows_x64
             bundle_type: nsis
+          - runner: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            label: linux_x64
+            bundle_type: deb
+          - runner: ubuntu-24.04-arm64
+            rust_target: aarch64-unknown-linux-gnu
+            label: linux_arm64
+            bundle_type: deb
 
     runs-on: ${{ matrix.runner }}
 
@@ -116,6 +124,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust_target }}
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libjavascriptcoregtk-4.1-dev libsoup-3.0-dev
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -186,11 +200,39 @@ jobs:
 
           echo "installer_path=$NSIS_DIR/$FINAL_NAME" >> "$GITHUB_OUTPUT"
 
+      - name: Find and rename Linux installers
+        if: runner.os == 'Linux'
+        id: linux_installer
+        run: |
+          # Handle .deb
+          DEB_DIR="src-tauri/target/${{ matrix.rust_target }}/release/bundle/deb"
+          DEB_FILE=$(ls "$DEB_DIR"/*.deb 2>/dev/null | head -n1)
+          if [ -n "$DEB_FILE" ]; then
+            BASENAME=$(basename "$DEB_FILE" .deb)
+            FINAL_DEB="${BASENAME}-${{ matrix.label }}.deb"
+            mv "$DEB_FILE" "$DEB_DIR/$FINAL_DEB"
+            echo "deb_path=$DEB_DIR/$FINAL_DEB" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Handle .AppImage
+          APPIMAGE_DIR="src-tauri/target/${{ matrix.rust_target }}/release/bundle/appimage"
+          APPIMAGE_FILE=$(ls "$APPIMAGE_DIR"/*.AppImage 2>/dev/null | head -n1)
+          if [ -n "$APPIMAGE_FILE" ]; then
+            BASENAME=$(basename "$APPIMAGE_FILE" .AppImage)
+            FINAL_APPIMAGE="${BASENAME}-${{ matrix.label }}.AppImage"
+            mv "$APPIMAGE_FILE" "$APPIMAGE_DIR/$FINAL_APPIMAGE"
+            echo "appimage_path=$APPIMAGE_DIR/$FINAL_APPIMAGE" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: cf-studio-${{ matrix.label }}
-          path: ${{ steps.macos_installer.outputs.installer_path || steps.windows_installer.outputs.installer_path }}
+          path: |
+            ${{ steps.macos_installer.outputs.installer_path }}
+            ${{ steps.windows_installer.outputs.installer_path }}
+            ${{ steps.linux_installer.outputs.deb_path }}
+            ${{ steps.linux_installer.outputs.appimage_path }}
           if-no-files-found: error
 
   release:
@@ -225,6 +267,8 @@ jobs:
             | macOS | Apple Silicon (M1/M2/M3/M4) | `CF-Studio-*-apple_silicon.dmg` |
             | macOS | Intel | `CF-Studio-*-intel_chip.dmg` |
             | Windows | x64 | `CF-Studio-*-windows_x64.exe` |
+            | Linux | x86_64 | `CF-Studio-*-linux_x64.{deb,AppImage}` |
+            | Linux | ARM64 | `CF-Studio-*-linux_arm64.{deb,AppImage}` |
 
             #### macOS Note
             *You may need to run this command in your terminal after first open if getting any issue.* 
