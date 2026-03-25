@@ -19,6 +19,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+          token: ${{ secrets.SUBMODULE_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -87,6 +88,7 @@ jobs:
         with:
           ref: main # Pull the latest changes (including the version bump)
           submodules: recursive
+          token: ${{ secrets.PRO_REPO_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
