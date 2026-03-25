@@ -143,8 +143,15 @@ export function useUpdater() {
 
       await relaunch();
     } catch (err) {
-      console.error("Failed to download update:", err);
-      setError(String(err));
+      console.error("Failed to download/install update:", err);
+      const msg = String(err);
+      if (msg.includes("404")) {
+        setError("Update assets not found. Release might be pending.");
+      } else if (msg.includes("signature")) {
+        setError("Update signature verification failed.");
+      } else {
+        setError(msg);
+      }
       setStatus("error");
     }
   }, [update]);
