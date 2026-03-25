@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { useAppStore } from "@/store/useAppStore";
 import { useTheme } from "@/components/ThemeProvider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

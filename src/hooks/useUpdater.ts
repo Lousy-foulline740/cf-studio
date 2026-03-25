@@ -152,9 +152,9 @@ export function useUpdater() {
           console.error("Failed to fix quarantine:", e);
         }
 
-        // For manual downloads, reveal the file so the user can run it
-        import('@tauri-apps/plugin-opener').then(m => m.revealItemInDir(destPath));
-        setError("Download complete! Please run the installer in your Downloads folder.");
+        // For manual downloads, open the installer automatically
+        import('@tauri-apps/plugin-opener').then(m => m.openPath(destPath));
+        setError("Download complete! Installer launched.");
         setStatus("available"); // Keep it available but error shows instructions
       } else {
         await (activeUpdate as Update).downloadAndInstall((event) => {
