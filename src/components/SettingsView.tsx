@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useToast } from "@/components/ui/use-toast";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "@/store/useAppStore";
 import { useTheme } from "@/components/ThemeProvider";
@@ -48,7 +49,19 @@ export function SettingsView() {
   const setAutoUpdate = useAppStore(s => s.setAutoUpdate);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  const { status, update, downloadProgress, checkForUpdates, downloadUpdate } = useUpdater();
+  const { toast } = useToast();
+  const { status, update, downloadProgress, error, checkForUpdates, downloadUpdate } = useUpdater();
+
+  // Show toast on update error
+  useEffect(() => {
+    if (error && status === "error") {
+      toast({
+        title: "Update Failed",
+        description: error,
+        variant: "destructive",
+      });
+    }
+  }, [error, status, toast]);
 
   const handleRefreshConnection = async () => {
     setIsRefreshing(true);

@@ -182,7 +182,16 @@ export function useUpdater() {
       }
     } catch (err) {
       console.error("Failed to download/install update:", err);
-      setError(String(err));
+      const msg = String(err);
+      if (msg.includes("404")) {
+        setError("Update assets not found on GitHub. The release might be pending or private.");
+      } else if (msg.includes("signature")) {
+        setError("Update signature verification failed. The binary might be untrusted.");
+      } else if (msg.includes("connection") || msg.includes("network")) {
+        setError("Network error. Please check your internet connection.");
+      } else {
+        setError(msg);
+      }
       setStatus("error");
     } finally {
       unlistenProgress();
