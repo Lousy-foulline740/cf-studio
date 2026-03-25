@@ -71,6 +71,7 @@ export function useUpdater() {
         manifest = await check();
       } catch (nativeErr) {
         console.warn("Native check failed, falling back to manual detection:", nativeErr);
+        // If it's a dev build or missing signature, we'll see it here
       }
 
       if (manifest) {
@@ -106,53 +107,85 @@ export function useUpdater() {
     const activeUpdate = targetUpdate || update;
     if (!activeUpdate) return;
 
-    if (activeUpdate.isManualDetection) {
-       setError("Please run: " + activeUpdate.installCommand);
-       return;
-    }
-
     setStatus("downloading");
     setDownloadProgress(0);
+
+    const unlistenProgress = await (import('@tauri-apps/api/event').then(m => 
+      m.listen<number>("update-download-progress", (event) => {
+        setDownloadProgress(Math.round(event.payload));
+      })
+    ));
+
     try {
-      let downloaded = 0;
-      let contentLength = 0;
+      if (activeUpdate.isManualDetection) {
+        // Refined URL construction based on historical patterns
+        const isMac = navigator.platform.toLowerCase().includes('mac');
+        const isWin = navigator.platform.toLowerCase().includes('win');
+        const isArm = navigator.userAgent.includes('arm64') || navigator.userAgent.includes('AppleWebKit') && !navigator.userAgent.includes('Intel');
+        
+        let binaryUrl = "";
+        let filename = "";
 
-      await (activeUpdate as Update).downloadAndInstall((event) => {
-        switch (event.event) {
-          case "Started":
-            contentLength = event.data.contentLength || 0;
-            break;
-          case "Progress":
-            downloaded += event.data.chunkLength;
-            if (contentLength > 0) {
-              setDownloadProgress(Math.round((downloaded / contentLength) * 100));
-            }
-            break;
-          case "Finished":
-            setDownloadProgress(100);
-            break;
+        const ver = activeUpdate.version;
+        if (isMac) {
+          const archStr = isArm ? "aarch64" : "x64";
+          binaryUrl = `https://github.com/mubashardev/cf-studio/releases/download/v${ver}/CF_Studio_${ver}_${archStr}.dmg`;
+          filename = `CF_Studio_${ver}_${archStr}.dmg`;
+        } else if (isWin) {
+          binaryUrl = `https://github.com/mubashardev/cf-studio/releases/download/v${ver}/CF_Studio_${ver}_x64_en-US.msi.zip`;
+          filename = `CF_Studio_${ver}_x64_en-US.msi.zip`;
+        } else {
+          // Linux fallback
+          binaryUrl = `https://github.com/mubashardev/cf-studio/releases/download/v${ver}/cf-studio_${ver}_amd64.AppImage.tar.gz`;
+          filename = `cf-studio_${ver}_amd64.AppImage.tar.gz`;
         }
-      });
-      
-      // Before relaunching, try to clear the quarantine flag on macOS
-      try {
-        await invoke("fix_mac_quarantine");
-      } catch (e) {
-        console.error("Failed to fix quarantine:", e);
-      }
 
-      await relaunch();
+        if (!binaryUrl) throw new Error("Automatic download not supported for this platform yet.");
+
+        const destPath = await invoke("download_update_binary", { url: binaryUrl, filename }) as string;
+        setDownloadProgress(100);
+        
+        // Before relaunching/finishing, try to clear the quarantine flag on macOS
+        try {
+          await invoke("fix_mac_quarantine");
+        } catch (e) {
+          console.error("Failed to fix quarantine:", e);
+        }
+
+        // For manual downloads, reveal the file so the user can run it
+        import('@tauri-apps/plugin-opener').then(m => m.revealItemInDir(destPath));
+        setError("Download complete! Please run the installer in your Downloads folder.");
+        setStatus("available"); // Keep it available but error shows instructions
+      } else {
+        await (activeUpdate as Update).downloadAndInstall((event) => {
+          switch (event.event) {
+            case "Started": break;
+            case "Progress":
+              if (event.data.chunkLength && (activeUpdate as any).contentLength) {
+                // native progress handling if needed
+              }
+              break;
+            case "Finished":
+              setDownloadProgress(100);
+              break;
+          }
+        });
+        
+        // Before relaunching, try to clear the quarantine flag on macOS
+        try {
+          await invoke("fix_mac_quarantine");
+        } catch (e) {
+          console.error("Failed to fix quarantine:", e);
+        }
+
+        await relaunch();
+      }
     } catch (err) {
       console.error("Failed to download/install update:", err);
-      const msg = String(err);
-      if (msg.includes("404")) {
-        setError("Update assets not found. Release might be pending.");
-      } else if (msg.includes("signature")) {
-        setError("Update signature verification failed.");
-      } else {
-        setError(msg);
-      }
+      setError(String(err));
       setStatus("error");
+    } finally {
+      unlistenProgress();
     }
   }, [update]);
 

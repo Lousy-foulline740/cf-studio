@@ -44,6 +44,43 @@ fn greet(name: &str) -> String {
 use std::process::Command;
 
 #[tauri::command]
+async fn download_update_binary(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    url: String,
+    filename: String,
+) -> Result<String, String> {
+    use futures_util::StreamExt;
+    use std::io::Write;
+    use tauri::{Emitter, Manager};
+    use tauri_plugin_fs::FsExt;
+
+    let response = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+    let total_size = response
+        .content_length()
+        .ok_or_else(|| "Failed to get content length".to_string())?;
+
+    let download_dir = app.path().download_dir().map_err(|e| e.to_string())?;
+    let dest_path = download_dir.join(&filename);
+    let mut file = std::fs::File::create(&dest_path).map_err(|e| e.to_string())?;
+
+    let mut downloaded: u64 = 0;
+    let mut stream = response.bytes_stream();
+
+    while let Some(item) = stream.next().await {
+        let chunk = item.map_err(|e| e.to_string())?;
+        file.write_all(&chunk).map_err(|e| e.to_string())?;
+        downloaded += chunk.len() as u64;
+
+        // Emit progress every ~100KB or so to not flood the bridge
+        let progress = (downloaded as f64 / total_size as f64) * 100.0;
+        let _ = window.emit("update-download-progress", progress);
+    }
+
+    Ok(dest_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 fn fix_mac_quarantine() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -104,6 +141,7 @@ pub fn run() {
             // ── Setup ──
             setup::check_dependencies,
             setup::install_dependencies,
+            download_update_binary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -337,12 +337,7 @@ export function SettingsView() {
                           disabled={status === "checking"}
                           onClick={() => {
                             if (status === "available") {
-                              if (update?.isManualDetection) {
-                                // For manual fallback, open the release page
-                                openUrl("https://github.com/mubashardev/cf-studio/releases/latest");
-                              } else {
-                                downloadUpdate();
-                              }
+                              downloadUpdate();
                             } else {
                               checkForUpdates();
                             }
