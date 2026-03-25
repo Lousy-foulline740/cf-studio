@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.verify_version.outputs.new_version }}
+      release_body: ${{ steps.verify_version.outputs.release_body }}
     permissions:
       contents: write
     steps:
@@ -19,7 +20,8 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-          token: ${{ secrets.SUBMODULE_PAT }}
+          token: ${{ secrets.SUBMODULE_PAT || secrets.GITHUB_TOKEN }}
+          persist-credentials: true
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -30,8 +32,6 @@ jobs:
         id: verify_version
         run: |
           set -o pipefail
-          # Run verification and capture only the last line (the version)
-          # We use a temporary file to keep the full output for debugging
           ./scripts/verify_release.sh > verification_output.log 2>&1
           EXIT_CODE=$?
           cat verification_output.log
@@ -44,10 +44,8 @@ jobs:
           NEW_VERSION=$(tail -n 1 verification_output.log)
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           
-          # Extract release notes for the body
+          # Extract release notes
           BODY=$(jq -r '.[0] | "### Features\n" + (.features | map("- " + .) | join("\n")) + "\n\n### Fixes\n" + (.fixes | map("- " + .) | join("\n"))' changelogs/changelogs.json)
-          
-          # Use a multi-line output for the body
           echo "release_body<<EOF" >> $GITHUB_OUTPUT
           echo "$BODY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -56,17 +54,17 @@ jobs:
         run: |
           NEW_VERSION=${{ steps.verify_version.outputs.new_version }}
           
-          # Bump package.json
+          # Bump manifests
           jq ".version = \"$NEW_VERSION\"" package.json > package.json.tmp && mv package.json.tmp package.json
-          
-          # Bump src-tauri/tauri.conf.json
           jq ".version = \"$NEW_VERSION\"" src-tauri/tauri.conf.json > src-tauri/tauri.conf.json.tmp && mv src-tauri/tauri.conf.json.tmp src-tauri/tauri.conf.json
+          
+          # Update Cargo.toml version
+          sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" src-tauri/Cargo.toml
           
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json src-tauri/tauri.conf.json
+          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
           
-          # Only commit if there are changes
           if ! git diff --cached --exit-code; then
             git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
             git push
@@ -77,18 +75,19 @@ jobs:
   build:
     needs: prepare
     runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
         platform: [macos-latest, ubuntu-latest, windows-latest]
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: main # Pull the latest changes (including the version bump)
           submodules: recursive
-          token: ${{ secrets.PRO_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SUBMODULE_PAT || secrets.GITHUB_TOKEN }}
+          persist-credentials: true
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
