@@ -44,25 +44,24 @@ jobs:
           NEW_VERSION=$(tail -n 1 verification_output.log)
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           
-          # Extract release notes
-          BODY=$(jq -r '.[0] | "### Features\n" + (.features | map("- " + .) | join("\n")) + "\n\n### Fixes\n" + (.fixes | map("- " + .) | join("\n"))' changelogs/changelogs.json)
-          
-          # Append platform notes
-          FULL_BODY=$(cat <<'EOF'
-$BODY
-
----
-### macOS Note
-You may need to run this command in your terminal after first open if getting any issue:
-`xattr -cr /Applications/CF\ Studio.app`
-
-### Windows Note
-Windows SmartScreen may show a warning — click "More info" → "Run anyway" to proceed.
-EOF
-)
-          echo "release_body<<EOF" >> $GITHUB_OUTPUT
-          echo "$FULL_BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          # Generate release body
+          {
+            echo "release_body<<EOF"
+            echo "### Features"
+            jq -r '.[0].features | map("- " + .) | join("\n")' changelogs/changelogs.json
+            echo ""
+            echo "### Fixes"
+            jq -r '.[0].fixes | map("- " + .) | join("\n")' changelogs/changelogs.json
+            echo ""
+            echo "---"
+            echo "### macOS Note"
+            echo "You may need to run this command in your terminal after first open if getting any issue:"
+            echo "\`xattr -cr /Applications/CF\ Studio.app\`"
+            echo ""
+            echo "### Windows Note"
+            echo "Windows SmartScreen may show a warning — click \"More info\" → \"Run anyway\" to proceed."
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Bump Version and Commit
         run: |
