@@ -4,7 +4,7 @@ import { open } from "@tauri-apps/plugin-shell";
 import { useAppStore } from "@/store/useAppStore";
 import { useTheme } from "@/components/ThemeProvider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { 
@@ -19,7 +19,6 @@ import {
   Info, 
   Download,
   CheckCircle2,
-  AlertCircle,
   Zap,
   Globe,
   Mail,
@@ -42,7 +41,6 @@ export function SettingsView() {
   const activeAccount = useAppStore(s => s.activeAccount);
   const tableDensity = useAppStore(s => s.tableDensity);
   const setTableDensity = useAppStore(s => s.setTableDensity);
-  const setCloudflareAccountId = useAppStore(s => s.setCloudflareAccountId);
   const privacySettings = useAppStore(s => s.privacySettings);
   const setPrivacySettings = useAppStore(s => s.setPrivacySettings);
   const showTableColumnCounts = useAppStore(s => s.showTableColumnCounts);

@@ -257,7 +257,7 @@ function Sidebar({
 }
 
 import { useUpdater } from "@/hooks/useUpdater";
-import { Loader2, Download as DownloadIcon, AlertCircle } from "lucide-react";
+import { Download as DownloadIcon, AlertCircle } from "lucide-react";
 
 // ── Title Bar ─────────────────────────────────────────────────────────────────
 interface TitleBarProps {
