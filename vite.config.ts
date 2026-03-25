@@ -19,6 +19,16 @@ export default defineConfig(async () => ({
     },
   },
 
+  // ── Build-time feature flags ──────────────────────────────────────────────────
+  // Set CF_STUDIO_PRO=true in your environment before running `npm run tauri dev`
+  // or `npm run tauri build` to produce a Pro edition that unlocks all R2 features.
+  //
+  //   Public build (default):      IS_PRO === false
+  //   Pro build:   CF_STUDIO_PRO=true npm run tauri build
+  define: {
+    __APP_IS_PRO__: process.env.CF_STUDIO_PRO === "true",
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

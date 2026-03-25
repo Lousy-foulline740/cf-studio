@@ -31,6 +31,11 @@ export interface BucketDomainsInfo {
   custom: any[];
 }
 
+export interface CfZone {
+  id: string;
+  name: string;
+}
+
 // ── R2 Operations ──────────────────────────────────────────────────────────────
 
 export async function createR2Bucket(bucketName: string): Promise<void> {
@@ -134,10 +139,18 @@ export async function updateR2BucketManagedDomain(bucketName: string, enabled: b
   return invokeCloudflare<void>("update_r2_bucket_managed_domain", { bucketName, enabled });
 }
 
-export async function addR2BucketCustomDomain(bucketName: string, domain: string, zoneId: string): Promise<void> {
-  return invokeCloudflare<void>("add_r2_bucket_custom_domain", { bucketName, domain, zoneId });
+export async function addR2BucketCustomDomain(bucketName: string, domain: string, zoneId: string, zoneName: string): Promise<void> {
+  return invokeCloudflare<void>("add_r2_bucket_custom_domain", { bucketName, domain, zoneId, zoneName });
 }
 
 export async function removeR2BucketCustomDomain(bucketName: string, domain: string): Promise<void> {
   return invokeCloudflare<void>("remove_r2_bucket_custom_domain", { bucketName, domain });
+}
+
+/**
+ * List all DNS zones in the user's Cloudflare account.
+ * Used to auto-resolve which zone a custom domain belongs to.
+ */
+export async function fetchCloudflareZones(): Promise<CfZone[]> {
+  return invokeCloudflare<CfZone[]>("fetch_cloudflare_zones");
 }

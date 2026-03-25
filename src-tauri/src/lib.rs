@@ -4,6 +4,7 @@ pub mod cloudflare_auth;
 pub mod cloudflare_client;
 pub mod d1;
 pub mod r2;
+pub mod r2_pro;
 pub mod setup;
 pub mod user;
 
@@ -24,8 +25,6 @@ pub struct UploadState {
 /// React frontend. Never asks the user for a token — pure zero-touch auth.
 #[tauri::command]
 async fn get_cloudflare_token() -> Result<CloudflareCredentials, AuthError> {
-    // `read_credentials` does synchronous file I/O; run it on a blocking
-    // thread so we don't stall the Tokio executor.
     tokio::task::spawn_blocking(read_credentials)
         .await
         .unwrap_or_else(|e| Err(AuthError::Io(std::io::Error::new(
@@ -63,20 +62,24 @@ pub fn run() {
             d1::fetch_d1_databases,
             d1::execute_d1_query,
             user::fetch_user_profile,
-            r2::create_r2_bucket,
-            r2::delete_r2_bucket,
-            r2::empty_r2_bucket,
+            // ── R2 Public ──
             r2::fetch_r2_buckets,
             r2::list_r2_objects,
             r2::delete_r2_object,
-            r2::upload_r2_object,
-            r2::cancel_upload_r2_object,
-            r2::download_r2_object,
             r2::get_r2_bucket_domain,
-            r2::update_r2_bucket_managed_domain,
-            r2::add_r2_bucket_custom_domain,
-            r2::remove_r2_bucket_custom_domain,
-            r2::get_r2_bucket_domains_list,
+            // ── R2 Pro (gated by remote config on the frontend) ──
+            r2_pro::fetch_cloudflare_zones,
+            r2_pro::create_r2_bucket,
+            r2_pro::delete_r2_bucket,
+            r2_pro::empty_r2_bucket,
+            r2_pro::upload_r2_object,
+            r2_pro::cancel_upload_r2_object,
+            r2_pro::download_r2_object,
+            r2_pro::update_r2_bucket_managed_domain,
+            r2_pro::add_r2_bucket_custom_domain,
+            r2_pro::remove_r2_bucket_custom_domain,
+            r2_pro::get_r2_bucket_domains_list,
+            // ── Setup ──
             setup::check_dependencies,
             setup::install_dependencies,
         ])
