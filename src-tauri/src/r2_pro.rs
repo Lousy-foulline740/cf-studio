@@ -369,7 +369,7 @@ pub async fn update_r2_bucket_managed_domain(bucket_name: String, enabled: bool)
 }
 
 #[tauri::command]
-pub async fn add_r2_bucket_custom_domain(bucket_name: String, domain: String, zone_id: String, zone_name: String) -> Result<(), R2Error> {
+pub async fn add_r2_bucket_custom_domain(bucket_name: String, domain: String, zone_id: String, _zone_name: String) -> Result<(), R2Error> {
     let creds = tokio::task::spawn_blocking(read_credentials)
         .await
         .map_err(|e| R2Error::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))??;

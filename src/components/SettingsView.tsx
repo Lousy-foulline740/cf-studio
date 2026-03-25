@@ -1,17 +1,39 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-shell";
 import { useAppStore } from "@/store/useAppStore";
 import { useTheme } from "@/components/ThemeProvider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Monitor, Moon, RefreshCw, Sun, ExternalLink } from "lucide-react";
+import { 
+  Monitor, 
+  Moon, 
+  RefreshCw, 
+  Sun, 
+  ExternalLink, 
+  Shield, 
+  Palette, 
+  Settings2, 
+  Info, 
+  Download,
+  CheckCircle2,
+  AlertCircle,
+  Zap,
+  Globe,
+  Mail,
+  User,
+  ArrowRight
+} from "lucide-react";
 import appVersion from "../../package.json";
+import changelogsData from "../../changelogs/changelogs.json";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useUpdater } from "@/hooks/useUpdater";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export function SettingsView() {
   const { theme, setTheme } = useTheme();
@@ -25,15 +47,17 @@ export function SettingsView() {
   const setPrivacySettings = useAppStore(s => s.setPrivacySettings);
   const showTableColumnCounts = useAppStore(s => s.showTableColumnCounts);
   const setShowTableColumnCounts = useAppStore(s => s.setShowTableColumnCounts);
+  const autoUpdate = useAppStore(s => s.autoUpdate);
+  const setAutoUpdate = useAppStore(s => s.setAutoUpdate);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  const { status, update, downloadProgress, checkForUpdates, downloadUpdate } = useUpdater();
 
   const handleRefreshConnection = async () => {
     setIsRefreshing(true);
     try {
-      const creds = await invoke<any>("refresh_wrangler_token");
-      if (creds.account_id) {
-        setCloudflareAccountId(creds.account_id);
-      }
+      await invoke<any>("refresh_wrangler_token");
+      // App store will be updated via watcher
     } catch (e) {
       console.error("Failed to refresh token", e);
     } finally {
@@ -41,226 +65,361 @@ export function SettingsView() {
     }
   };
 
+  const currentChangelog = useMemo(() => {
+    return changelogsData.find(c => c.version === appVersion.version);
+  }, []);
+
+  const nextChangelog = useMemo(() => {
+    if (!update) return null;
+    return changelogsData.find(c => c.version === update.version);
+  }, [update]);
+
   return (
     <ScrollArea className="h-full">
-      <div className="max-w-4xl mx-auto py-6 pr-6">
-        <h1 className="text-2xl font-bold tracking-tight mb-6">Settings</h1>
+      <div className="max-w-5xl mx-auto py-8 px-6 space-y-8">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+          <p className="text-muted-foreground">Manage your application preferences and Cloudflare connection.</p>
+        </div>
         
-        <Tabs defaultValue="general" className="flex flex-col md:flex-row gap-6">
-          <TabsList className="flex md:flex-col h-auto justify-start bg-transparent space-y-1 p-0 w-full md:w-48 overflow-x-auto shrink-0 border-b md:border-b-0 md:border-r border-border rounded-none pb-2 md:pb-0 md:pr-4">
-            <TabsTrigger value="general" className="w-full justify-start data-[state=active]:bg-muted">General</TabsTrigger>
-            <TabsTrigger value="appearance" className="w-full justify-start data-[state=active]:bg-muted">Appearance</TabsTrigger>
-            <TabsTrigger value="about" className="w-full justify-start data-[state=active]:bg-muted">About</TabsTrigger>
+        <Tabs defaultValue="general" className="flex flex-col md:flex-row gap-10">
+          <TabsList className="flex md:flex-col h-auto justify-start bg-transparent space-y-1 p-0 w-full md:w-56 shrink-0">
+            <TabsTrigger value="general" className="w-full justify-start gap-2 h-10 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all">
+              <Settings2 size={16} />
+              General
+            </TabsTrigger>
+            <TabsTrigger value="appearance" className="w-full justify-start gap-2 h-10 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all">
+              <Palette size={16} />
+              Appearance
+            </TabsTrigger>
+            <TabsTrigger value="privacy" className="w-full justify-start gap-2 h-10 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all">
+              <Shield size={16} />
+              Privacy
+            </TabsTrigger>
+            <TabsTrigger value="updates" className="w-full justify-start gap-2 h-10 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all relative">
+              <Download size={16} />
+              Updates
+              {status === "available" && (
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 w-2 h-2 bg-primary rounded-full animate-pulse" />
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="about" className="w-full justify-start gap-2 h-10 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all">
+              <Info size={16} />
+              About
+            </TabsTrigger>
           </TabsList>
 
           <div className="flex-1 min-w-0">
-            <TabsContent value="general" className="m-0 space-y-6 animate-in fade-in-50 duration-200">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Cloudflare Connection</CardTitle>
-                  <CardDescription>Manage your Wrangler authentication state</CardDescription>
+            {/* General Tab */}
+            <TabsContent value="general" className="m-0 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              <Card className="overflow-hidden border-none shadow-md bg-muted/20">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Globe size={18} className="text-primary" />
+                    <CardTitle className="text-lg">Cloudflare Account</CardTitle>
+                  </div>
+                  <CardDescription>Configure how CF Studio connects to your Cloudflare infrastructure.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between p-4 border border-border rounded-lg bg-muted/30">
-                    <div className="flex items-center gap-3">
-                      <div className="relative flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  <div className="flex items-center justify-between p-5 border border-border/50 rounded-xl bg-background/50 backdrop-blur-sm">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
+                        <Zap size={20} />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">Wrangler Connected</p>
-                        <p className="text-xs text-muted-foreground">Authenticated via local config session</p>
+                        <p className="text-sm font-semibold">Wrangler Session</p>
+                        <p className="text-xs text-muted-foreground">Connected via local CLI configuration</p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" onClick={handleRefreshConnection} disabled={isRefreshing}>
-                      <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-                      Refresh
+                    <Button variant="secondary" size="sm" onClick={handleRefreshConnection} disabled={isRefreshing} className="h-8">
+                      <RefreshCw className={cn("mr-2 h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+                      Refresh Token
                     </Button>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Cloudflare Account ID</Label>
-                      <div className="px-3 py-2 text-sm bg-muted/50 rounded-md font-mono border border-border truncate text-muted-foreground select-all h-9 flex items-center">
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-2.5">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <User size={14} />
+                        <Label className="text-xs font-semibold uppercase tracking-wider">Account ID</Label>
+                      </div>
+                      <div className="group relative px-3 py-2 text-sm bg-background border border-border/50 rounded-lg font-mono truncate select-all h-10 flex items-center transition-colors hover:border-primary/30">
                         {activeAccount?.id || cloudflareAccountId || "Not available"}
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>User Email</Label>
-                      <div className="px-3 py-2 text-sm bg-muted/50 rounded-md font-mono border border-border truncate text-muted-foreground h-9 flex items-center">
+                    <div className="space-y-2.5">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Mail size={14} />
+                        <Label className="text-xs font-semibold uppercase tracking-wider">User Email</Label>
+                      </div>
+                      <div className="px-3 py-2 text-sm bg-background border border-border/50 rounded-lg font-mono truncate h-10 flex items-center">
                         {userProfile?.email || "Fetching..."}
                       </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="appearance" className="m-0 space-y-6 animate-in fade-in-50 duration-200">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Appearance & Behavior</CardTitle>
-                  <CardDescription>Customize how CF Studio looks and feels on your machine</CardDescription>
+              <Card className="border-none shadow-md bg-muted/20">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg">App Behavior</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-8">
-                  {/* Theme */}
-                  <div className="space-y-3">
-                    <Label>Theme Preference</Label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { value: "light", label: "Light", icon: Sun },
-                        { value: "dark", label: "Dark", icon: Moon },
-                        { value: "system", label: "System", icon: Monitor },
-                      ].map(({ value, label, icon: Icon }) => (
-                        <button
-                          key={value}
-                          onClick={() => setTheme(value as typeof theme)}
-                          className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                            theme === value ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:bg-muted"
-                          }`}
-                        >
-                          <Icon size={20} />
-                          <span className="text-sm font-medium">{label}</span>
-                        </button>
-                      ))}
+                <CardContent>
+                  <div className="flex items-center justify-between py-2">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Automatic Updates</Label>
+                      <p className="text-xs text-muted-foreground">Download and install updates automatically on startup.</p>
                     </div>
-                  </div>
-
-                  {/* Density */}
-                  <div className="space-y-3">
-                    <Label>Data Table Density</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {[
-                        { value: "comfortable", label: "Comfortable", desc: "More padding, relaxed reading" },
-                        { value: "compact", label: "Compact", desc: "Maximum data rows on screen" },
-                      ].map(({ value, label, desc }) => (
-                        <button
-                          key={value}
-                          onClick={() => setTableDensity(value as "compact" | "comfortable")}
-                          className={`flex flex-col items-start p-4 rounded-xl border-2 transition-all text-left ${
-                            tableDensity === value ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:bg-muted"
-                          }`}
-                        >
-                          <span className="text-sm font-medium mb-1 text-foreground">{label}</span>
-                          <span className="text-xs">{desc}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Table Metadata */}
-                  <div className="space-y-4 pt-2 border-t border-border/50">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="text-sm font-medium">Show Table Column Counts</Label>
-                        <p className="text-xs text-muted-foreground italic">Display "X cols" chips in the table navigation sidebar</p>
-                      </div>
-                      <Switch 
-                        checked={showTableColumnCounts} 
-                        onCheckedChange={(checked) => setShowTableColumnCounts(!!checked)} 
-                      />
-                    </div>
-                  </div>
-
-                  {/* Privacy Mode */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label className="text-base">Privacy Mode</Label>
-                        <p className="text-xs text-muted-foreground">Blur sensitive information. Hover to reveal.</p>
-                      </div>
-                      <Switch 
-                        checked={privacySettings.enabled} 
-                        onCheckedChange={(c) => setPrivacySettings({ enabled: c })} 
-                      />
-                    </div>
-                    
-                    {privacySettings.enabled && (
-                      <div className="pl-6 space-y-3 border-l-2 border-primary/20 animate-in fade-in slide-in-from-top-2">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="privacy-account" 
-                            checked={privacySettings.accountInfo}
-                            onCheckedChange={(c) => setPrivacySettings({ accountInfo: !!c })} 
-                          />
-                          <Label htmlFor="privacy-account" className="font-normal cursor-pointer">Account Name & Email</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="privacy-db" 
-                            checked={privacySettings.databaseNames}
-                            onCheckedChange={(c) => setPrivacySettings({ databaseNames: !!c })} 
-                          />
-                          <Label htmlFor="privacy-db" className="font-normal cursor-pointer">Database Names</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="privacy-db-id" 
-                            checked={privacySettings.databaseIds}
-                            onCheckedChange={(c) => setPrivacySettings({ databaseIds: !!c })} 
-                          />
-                          <Label htmlFor="privacy-db-id" className="font-normal cursor-pointer">Database IDs</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="privacy-tables" 
-                            checked={privacySettings.tableNames}
-                            onCheckedChange={(c) => setPrivacySettings({ tableNames: !!c })} 
-                          />
-                          <Label htmlFor="privacy-tables" className="font-normal cursor-pointer">Table Names</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="privacy-buckets" 
-                            checked={privacySettings.r2BucketNames}
-                            onCheckedChange={(c) => setPrivacySettings({ r2BucketNames: !!c })} 
-                          />
-                          <Label htmlFor="privacy-buckets" className="font-normal cursor-pointer">R2 Bucket Names</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox 
-                            id="privacy-files" 
-                            checked={privacySettings.r2FileNames}
-                            onCheckedChange={(c) => setPrivacySettings({ r2FileNames: !!c })} 
-                          />
-                          <Label htmlFor="privacy-files" className="font-normal cursor-pointer">R2 File/Object Names</Label>
-                        </div>
-                      </div>
-                    )}
+                    <Switch checked={autoUpdate} onCheckedChange={setAutoUpdate} />
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            <TabsContent value="about" className="m-0 space-y-6 animate-in fade-in-50 duration-200">
-              <Card>
-                <CardContent className="p-12 flex flex-col items-center justify-center text-center space-y-4">
-                  <img
-                    src={theme === "dark" ? "/app-icon-dark.png" : "/app-icon.png"}
-                    alt="CF Studio"
-                    className="w-20 h-20 rounded-2xl shadow-lg"
-                    draggable={false}
-                  />
-                  <div>
-                    <h2 className="text-xl font-bold tracking-tight">CF Studio</h2>
-                    <p className="text-sm text-muted-foreground mt-1 font-mono">v{appVersion.version}</p>
+            {/* Appearance Tab */}
+            <TabsContent value="appearance" className="m-0 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              <Card className="border-none shadow-md bg-muted/20">
+                <CardHeader>
+                  <CardTitle className="text-lg">Theme</CardTitle>
+                  <CardDescription>Choose your preferred interface style.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { value: "light", label: "Light", icon: Sun, color: "bg-orange-500/10 text-orange-500" },
+                      { value: "dark", label: "Dark", icon: Moon, color: "bg-blue-500/10 text-blue-500" },
+                      { value: "system", label: "System", icon: Monitor, color: "bg-zinc-500/10 text-zinc-500" },
+                    ].map(({ value, label, icon: Icon, color }) => (
+                      <button
+                        key={value}
+                        onClick={() => setTheme(value as typeof theme)}
+                        className={cn(
+                          "group relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 transition-all duration-200",
+                          theme === value 
+                            ? "border-primary bg-primary/5 ring-4 ring-primary/10" 
+                            : "border-border/50 bg-background/50 hover:border-primary/30 hover:bg-background"
+                        )}
+                      >
+                        <div className={cn("p-2 rounded-full transition-transform group-hover:scale-110", color)}>
+                          <Icon size={24} />
+                        </div>
+                        <span className={cn("text-sm font-semibold", theme === value ? "text-primary" : "text-muted-foreground")}>{label}</span>
+                        {theme === value && <CheckCircle2 size={14} className="absolute top-2 right-2 text-primary" />}
+                      </button>
+                    ))}
                   </div>
-                  <p className="text-sm text-muted-foreground max-w-sm">
-                    A native desktop client for managing Cloudflare D1 databases with a visual interface.
+                </CardContent>
+              </Card>
+
+              <Card className="border-none shadow-md bg-muted/20">
+                <CardHeader>
+                  <CardTitle className="text-lg">Listings & Tables</CardTitle>
+                  <CardDescription>Optimize how data is displayed.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-3">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Row Density</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { value: "comfortable", label: "Comfortable", desc: "More whitespace" },
+                        { value: "compact", label: "Compact", desc: "More rows" },
+                      ].map(({ value, label, desc }) => (
+                        <button
+                          key={value}
+                          onClick={() => setTableDensity(value as any)}
+                          className={cn(
+                            "flex flex-col items-start p-4 rounded-xl border-2 transition-all p-4",
+                            tableDensity === value 
+                              ? "border-primary bg-primary/5" 
+                              : "border-border/50 bg-background/50 hover:border-primary/30"
+                          )}
+                        >
+                          <span className={cn("text-sm font-semibold", tableDensity === value ? "text-primary" : "text-foreground")}>{label}</span>
+                          <span className="text-xs text-muted-foreground">{desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Show Column Counts</Label>
+                      <p className="text-xs text-muted-foreground font-mono italic">Show table column metrics in sidebar</p>
+                    </div>
+                    <Switch checked={showTableColumnCounts} onCheckedChange={setShowTableColumnCounts} />
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Privacy Tab */}
+            <TabsContent value="privacy" className="m-0 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              <Card className="border-none shadow-md bg-muted/20">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Privacy Shield</CardTitle>
+                      <CardDescription>Obfuscate sensitive project data from prying eyes.</CardDescription>
+                    </div>
+                    <Switch checked={privacySettings.enabled} onCheckedChange={(c) => setPrivacySettings({ enabled: c })} />
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                   <div className={cn("grid gap-4 transition-all duration-300", !privacySettings.enabled && "opacity-40 grayscale pointer-events-none")}>
+                      {[
+                        { id: "accountInfo", label: "Account Name & Email", desc: "Blurs identifying account details" },
+                        { id: "databaseNames", label: "Database Names", desc: "Obfuscates D1 database identifiers" },
+                        { id: "databaseIds", label: "Database IDs", desc: "Hides unique resource UUIDs" },
+                        { id: "tableNames", label: "Table Names", desc: "Blurs names in the explorer" },
+                        { id: "r2BucketNames", label: "R2 Bucket Names", desc: "Hides storage bucket identifiers" },
+                        { id: "r2FileNames", label: "R2 File/Object Names", desc: "Obfuscates object keys in listings" },
+                      ].map((item) => (
+                        <div key={item.id} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-background/40 transition-colors">
+                          <Checkbox 
+                            id={`privacy-${item.id}`} 
+                            checked={(privacySettings as any)[item.id]} 
+                            onCheckedChange={(c) => setPrivacySettings({ [item.id]: !!c })} 
+                          />
+                          <div className="grid gap-0.5 leading-none">
+                            <label htmlFor={`privacy-${item.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">{item.label}</label>
+                            <p className="text-xs text-muted-foreground">{item.desc}</p>
+                          </div>
+                        </div>
+                      ))}
+                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Updates Tab */}
+            <TabsContent value="updates" className="m-0 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              <Card className="border-none shadow-md bg-muted/20 overflow-hidden">
+                <CardHeader className="pb-0">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg">Software Updates</CardTitle>
+                      <CardDescription>Keep your studio up to date with the latest features.</CardDescription>
+                    </div>
+                    <Badge variant={status === "available" ? "default" : "secondary"} className="rounded-full px-3">
+                      {status === "available" ? "Update Available" : status === "checking" ? "Checking..." : "Up to date"}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-8">
+                  <div className="flex flex-col items-center justify-center py-6 space-y-6 border-b border-border/50 pb-8">
+                    <div className="flex items-center gap-12 text-center">
+                      <div className="space-y-1">
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Current Version</p>
+                        <p className="text-2xl font-mono font-bold">1.0.9</p>
+                      </div>
+                      <ArrowRight className="text-muted-foreground/30" />
+                      <div className="space-y-1">
+                        <p className="text-[10px] uppercase font-bold text-primary tracking-widest">Newest Version</p>
+                        <p className="text-2xl font-mono font-bold">{update?.version || "1.0.9"}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="w-full max-w-sm space-y-4">
+                      {status === "downloading" ? (
+                        <div className="space-y-2">
+                           <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                              <div className="h-full bg-primary transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
+                           </div>
+                           <p className="text-xs text-center text-muted-foreground">Downloading update... {downloadProgress}%</p>
+                        </div>
+                      ) : (
+                        <Button 
+                          className="w-full rounded-xl h-11 text-base font-semibold" 
+                          onClick={() => status === "available" ? downloadUpdate() : checkForUpdates()}
+                          disabled={status === "checking"}
+                        >
+                          {status === "available" ? (
+                            <>
+                              <Download size={18} className="mr-2" />
+                              Update to v{update?.version} Now
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw size={18} className={cn("mr-2", status === "checking" && "animate-spin")} />
+                              Check for Updates
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-6 space-y-4">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                       <CheckCircle2 size={16} className="text-primary" />
+                       Changelog for {update?.version || appVersion.version}
+                    </h3>
+                    <div className="space-y-4 p-4 rounded-xl bg-background/50 border border-border/50">
+                        {nextChangelog ? (
+                          <div className="space-y-4">
+                            {nextChangelog.features.map((f, i) => (
+                              <div key={i} className="flex gap-3 text-sm">
+                                <span className="text-primary font-bold opacity-50 select-none">•</span>
+                                <span>{f}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {currentChangelog?.features.map((f, i) => (
+                              <div key={i} className="flex gap-3 text-sm">
+                                <span className="text-primary font-bold opacity-50 select-none">•</span>
+                                <span>{f}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* About Tab */}
+            <TabsContent value="about" className="m-0 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              <Card className="border-none shadow-xl bg-gradient-to-br from-primary/5 to-primary/10 overflow-hidden">
+                <CardContent className="p-16 flex flex-col items-center justify-center text-center space-y-8 relative">
+                  <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,var(--primary-muted),transparent)] opacity-20" />
+                  
+                  <div className="relative">
+                    <div className="absolute -inset-4 bg-primary/20 blur-2xl rounded-full animate-pulse" />
+                    <img
+                      src={theme === "dark" ? "/app-icon-dark.png" : "/app-icon.png"}
+                      alt="CF Studio"
+                      className="w-24 h-24 rounded-3xl shadow-2xl relative border-2 border-white/10"
+                      draggable={false}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h2 className="text-3xl font-black tracking-tight bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-transparent">CF Studio</h2>
+                    <p className="text-sm text-muted-foreground font-mono bg-background/50 py-1 px-3 rounded-full border border-border/50 inline-block">version {appVersion.version}</p>
+                  </div>
+                  
+                  <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
+                    A high-performance native desktop client for modern Cloudflare workflows. 
+                    Manage D1 databases and R2 storage with speed and elegance.
                   </p>
-                  <div className="pt-2 flex gap-3">
-                    <Button variant="outline" size="sm" onClick={() => open("https://github.com/mubashardev/cf-studio")}>
-                      <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                  
+                  <div className="flex gap-4">
+                    <Button variant="outline" className="rounded-xl px-6 h-11 border-border/50 bg-background/50" onClick={() => open("https://github.com/mubashardev/cf-studio")}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
                       GitHub
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => open("https://cfstudio.dev")}>
-                      <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                    <Button variant="outline" className="rounded-xl px-6 h-11 border-border/50 bg-background/50" onClick={() => open("https://cfstudio.dev")}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
                       Website
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground pt-4">
+                  
+                  <div className="pt-8 text-xs text-muted-foreground opacity-50">
                     © {new Date().getFullYear()} CF Studio. All rights reserved.
-                  </p>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

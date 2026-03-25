@@ -62,6 +62,7 @@ interface AppState {
   // ── Preferences ──
   tableDensity: "compact" | "comfortable";
   showTableColumnCounts: boolean;
+  autoUpdate: boolean;
   isRefreshingSession: boolean;
   privacySettings: PrivacySettings;
 
@@ -86,6 +87,7 @@ interface AppState {
   setTableDensity: (density: "compact" | "comfortable") => void;
   setIsRefreshingSession: (isRefreshing: boolean) => void;
   setShowTableColumnCounts: (show: boolean) => void;
+  setAutoUpdate: (enabled: boolean) => void;
   setPrivacySettings: (settings: Partial<PrivacySettings>) => void;
 
   /** Overwrite the databases list and stamp the fetch time. */
@@ -123,6 +125,7 @@ export const useAppStore = create<AppState>()(
       r2Buckets: [],
       tableDensity: "comfortable",
       showTableColumnCounts: true,
+      autoUpdate: true,
       isRefreshingSession: false,
       privacySettings: {
         enabled: false,
@@ -146,6 +149,7 @@ export const useAppStore = create<AppState>()(
       setTableDensity: (density) => set({ tableDensity: density }),
       setIsRefreshingSession: (b) => set({ isRefreshingSession: b }),
       setShowTableColumnCounts: (show) => set({ showTableColumnCounts: show }),
+      setAutoUpdate: (enabled) => set({ autoUpdate: enabled }),
       setPrivacySettings: (settings) => set((s) => ({ privacySettings: { ...s.privacySettings, ...settings } })),
       setDatabases: (databases) =>
         set({ databases, lastFetched: Date.now() }),
@@ -199,6 +203,7 @@ export const useAppStore = create<AppState>()(
         accounts: state.accounts,
         activeAccount: state.activeAccount,
         tableDensity: state.tableDensity,
+        autoUpdate: state.autoUpdate,
         privacySettings: state.privacySettings,
         databases: state.databases,
         kvNamespaces: state.kvNamespaces,

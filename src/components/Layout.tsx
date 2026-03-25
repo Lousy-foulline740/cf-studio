@@ -256,22 +256,28 @@ function Sidebar({
   );
 }
 
+import { useUpdater } from "@/hooks/useUpdater";
+import { Loader2, Download as DownloadIcon, AlertCircle } from "lucide-react";
+
 // ── Title Bar ─────────────────────────────────────────────────────────────────
 interface TitleBarProps {
   collapsed: boolean;
   onToggle: () => void;
   title: string;
+  onNavigate: (id: string) => void;
 }
 
-function TitleBar({ collapsed, onToggle, title }: TitleBarProps) {
+function TitleBar({ collapsed, onToggle, title, onNavigate }: TitleBarProps) {
+  const { status, downloadProgress, update } = useUpdater();
+
   return (
     <header
       // Tauri: makes the entire bar draggable to move the window
       data-tauri-drag-region
       className={cn(
         "flex items-center h-11 shrink-0 border-b border-border",
-        "bg-background/90 backdrop-blur-sm",
-        "select-none",
+        "bg-background/90 backdrop-blur-sm shadow-sm",
+        "select-none z-50",
       )}
     >
       {/* Collapse toggle — not draggable */}
@@ -279,29 +285,77 @@ function TitleBar({ collapsed, onToggle, title }: TitleBarProps) {
         onClick={onToggle}
         data-tauri-drag-region="false"
         className={cn(
-          "flex items-center justify-center w-11 h-11 shrink-0",
-          "text-muted-foreground hover:text-foreground transition-colors",
+          "flex items-center justify-center w-11 h-11 shrink-0 border-r border-border/50",
+          "text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-all",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         )}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
         {collapsed ? (
-          <PanelLeftOpen size={16} strokeWidth={1.75} />
+          <PanelLeftOpen size={16} strokeWidth={2} />
         ) : (
-          <PanelLeftClose size={16} strokeWidth={1.75} />
+          <PanelLeftClose size={16} strokeWidth={2} />
         )}
       </button>
 
       {/* Drag region + title */}
       <div
         data-tauri-drag-region
-        className="flex-1 flex items-center h-full px-1"
+        className="flex-1 flex items-center h-full px-4 overflow-hidden"
       >
-        <span className="text-sm font-medium text-foreground/70">{title}</span>
+        <span className="text-sm font-semibold text-foreground/80 truncate">{title}</span>
       </div>
 
-      {/* GitHub Link — not draggable */}
-      <div data-tauri-drag-region="false" className="flex items-center pr-2">
+      {/* Update Indicator — not draggable */}
+      <div data-tauri-drag-region="false" className="flex items-center pr-4 gap-2">
+        {status === "downloading" && (
+          <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 rounded-full animate-in fade-in zoom-in-95">
+             <div className="relative w-5 h-5 flex items-center justify-center">
+                <svg className="w-full h-full -rotate-90">
+                  <circle
+                    cx="10"
+                    cy="10"
+                    r="8"
+                    fill="transparent"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="text-primary/20"
+                  />
+                  <circle
+                    cx="10"
+                    cy="10"
+                    r="8"
+                    fill="transparent"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeDasharray={2 * Math.PI * 8}
+                    strokeDashoffset={2 * Math.PI * 8 * (1 - downloadProgress / 100)}
+                    className="text-primary transition-all duration-300"
+                  />
+                </svg>
+                <DownloadIcon size={8} className="absolute text-primary animate-bounce mt-[1px]" />
+             </div>
+             <span className="text-[10px] font-bold text-primary font-mono">{downloadProgress}%</span>
+          </div>
+        )}
+
+        {status === "available" && (
+          <button 
+            onClick={() => onNavigate("settings")}
+            className="flex items-center gap-1.5 px-3 py-1 bg-primary text-primary-foreground rounded-full text-[10px] font-bold shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all animate-bounce"
+          >
+            <DownloadIcon size={12} strokeWidth={3} />
+            UPDATE V{update?.version}
+          </button>
+        )}
+
+        {status === "error" && (
+          <Badge variant="destructive" className="flex items-center gap-1 text-[10px] py-0.5 px-2">
+            <AlertCircle size={10} />
+            Update Error
+          </Badge>
+        )}
+
         <Button
           variant="ghost"
           size="sm"
@@ -393,6 +447,7 @@ export function Layout() {
             collapsed={collapsed}
             onToggle={() => setCollapsed((c) => !c)}
             title={pageTitle}
+            onNavigate={setActiveId}
           />
 
           {/* Content area */}

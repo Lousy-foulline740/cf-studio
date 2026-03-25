@@ -1,0 +1,104 @@
+[
+  {
+    "version": "1.0.9",
+    "date": "2026-03-22",
+    "features": [
+      "Dynamic pagination with custom row limits",
+      "Privacy settings to blur sensitive data across UI",
+      "D1 table column count visibility toggle"
+    ],
+    "fixes": [
+      "Updated Rust dependencies",
+      "Sync pro_modules submodule"
+    ]
+  },
+  {
+    "version": "1.0.8",
+    "date": "2026-03-22",
+    "features": [
+      "D1 index management with dedicated UI dialog",
+      "Optimized database metadata fetching"
+    ],
+    "fixes": [
+      "Standardize CSS variables in schema visualizer"
+    ]
+  },
+  {
+    "version": "1.0.7",
+    "date": "2026-03-22",
+    "features": [
+      "Wrangler session file watcher for auth",
+      "Integrated in-app Wrangler login command"
+    ],
+    "fixes": [
+      "Resolve release mode PATH issues"
+    ]
+  },
+  {
+    "version": "1.0.6",
+    "date": "2026-03-22",
+    "features": [
+      "In-app setup wizard for dependencies",
+      "Enhanced README with R2 Explorer details"
+    ],
+    "fixes": []
+  },
+  {
+    "version": "1.0.5",
+    "date": "2026-03-22",
+    "features": [
+      "R2 integration stability improvements",
+      "Added terminal installer screenshots"
+    ],
+    "fixes": []
+  },
+  {
+    "version": "1.0.4",
+    "date": "2026-03-22",
+    "features": [
+      "Build pipeline submodule refactor"
+    ],
+    "fixes": []
+  },
+  {
+    "version": "1.0.3",
+    "date": "2026-03-22",
+    "features": [
+      "Native Cloudflare REST API for R2 integration",
+      "Streaming R2 uploads with progress tracking"
+    ],
+    "fixes": []
+  },
+  {
+    "version": "1.0.2",
+    "date": "2026-03-21",
+    "features": [
+      "Full R2 bucket and domain management",
+      "Windows platform build support",
+      "Cloudflare-inspired branding and UI theme"
+    ],
+    "fixes": []
+  },
+  {
+    "version": "1.0.1",
+    "date": "2026-03-21",
+    "features": [
+      "macOS universal DMG artifact support",
+      "Soft deletion and undo for foreign keys",
+      "Relocated SQL editor to modal dialog"
+    ],
+    "fixes": []
+  },
+  {
+    "version": "1.0.0",
+    "date": "2026-03-21",
+    "features": [
+      "Initial stable release",
+      "Interactive ER diagram schema visualizer",
+      "Cloudflare D1 database & SQL query editor",
+      "Radix UI & Tailwind CSS implementation",
+      "Cloudflare account and profile management"
+    ],
+    "fixes": []
+  }
+]

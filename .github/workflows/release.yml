@@ -1,4 +1,4 @@
-name: Release Build
+name: Release
 
 on:
   push:
@@ -6,327 +6,98 @@ on:
       - main
 
 jobs:
-  version:
-    if: endsWith(github.event.head_commit.message, '--release')
+  prepare:
+    if: "endsWith(github.event.head_commit.message, '--release')"
     runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.verify_version.outputs.new_version }}
     permissions:
       contents: write
-    outputs:
-      new_version: ${{ steps.bump.outputs.new_version }}
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.SUBMODULE_PAT }}
-          submodules: recursive
-
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Determine next semantic version
-        id: bump
-        run: |
-          # Get the latest version tag (e.g. v1.0.9), default to v0.0.0
-          LATEST_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)
-
-          if [ -z "$LATEST_TAG" ]; then
-            # No tags yet — start at v1.0.0
-            NEW_VERSION="1.0.0"
-          else
-            # Strip leading 'v'
-            VERSION="${LATEST_TAG#v}"
-            MAJOR=$(echo "$VERSION" | cut -d. -f1)
-            MINOR=$(echo "$VERSION" | cut -d. -f2)
-            PATCH=$(echo "$VERSION" | cut -d. -f3)
-
-            if [ "$PATCH" -ge 9 ]; then
-              # Bump minor, reset patch
-              MINOR=$((MINOR + 1))
-              PATCH=0
-            else
-              # Bump patch
-              PATCH=$((PATCH + 1))
-            fi
-
-            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          fi
-
-          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "🏷️  Next version: v$NEW_VERSION"
-
-      - name: Update version in package.json
-        run: |
-          jq --arg v "${{ steps.bump.outputs.new_version }}" \
-            '.version = $v' package.json > package.tmp.json \
-            && mv package.tmp.json package.json
-
-      - name: Update version in tauri.conf.json
-        run: |
-          jq --arg v "${{ steps.bump.outputs.new_version }}" \
-            '.version = $v' src-tauri/tauri.conf.json > tauri.tmp.json \
-            && mv tauri.tmp.json src-tauri/tauri.conf.json
-
-      - name: Update version in Cargo.toml
-        run: |
-          sed -i "s/^version = \".*\"/version = \"${{ steps.bump.outputs.new_version }}\"/" src-tauri/Cargo.toml
-
-      - name: Commit version bump & create tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
-          git commit -m "chore: bump version to v${{ steps.bump.outputs.new_version }}"
-          git tag "v${{ steps.bump.outputs.new_version }}"
-          git config --local --unset-all "http.https://github.com/.extraheader" || true
-          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
-          git push origin main --tags
-
-  create_release:
-    needs: version
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ needs.version.outputs.new_version }}"
-          name: "CF Studio v${{ needs.version.outputs.new_version }}"
-          body: |
-            ## CF Studio v${{ needs.version.outputs.new_version }}
-
-            ### Downloads
-            | Platform | Architecture | File |
-            |----------|--------------|------|
-            | macOS | Apple Silicon (M1/M2/M3/M4) | `CF-Studio-*-apple_silicon.dmg` |
-            | macOS | Intel | `CF-Studio-*-intel_chip.dmg` |
-            | Windows | x64 | `CF-Studio-*-windows_x64.exe` |
-            | Linux | x86_64 | `CF-Studio-*-linux_x64.{deb,AppImage}` |
-            | Linux | ARM64 | `CF-Studio-*-linux_arm64.{deb,AppImage}` |
-
-            #### macOS Note
-            *You may need to run this command in your terminal after first open if getting any issue.* 
-            ```bash
-            xattr -cr /Applications/CF\ Studio.app
-            ```
-
-            #### Windows Note
-            *Windows SmartScreen may show a warning — click "More info" → "Run anyway" to proceed.*
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-
-  build:
-    needs: [version, create_release]
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-14
-            rust_target: aarch64-apple-darwin
-            label: apple_silicon
-            bundle_type: dmg
-          - runner: macos-14
-            rust_target: x86_64-apple-darwin
-            label: intel_chip
-            bundle_type: dmg
-          - runner: windows-latest
-            rust_target: x86_64-pc-windows-msvc
-            label: windows_x64
-            bundle_type: nsis
-          - runner: ubuntu-latest
-            rust_target: x86_64-unknown-linux-gnu
-            label: linux_x64
-            bundle_type: deb
-          - runner: ubuntu-24.04-arm64
-            rust_target: aarch64-unknown-linux-gnu
-            label: linux_arm64
-            bundle_type: deb
-
-    runs-on: ${{ matrix.runner }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: v${{ needs.version.outputs.new_version }}
-          token: ${{ secrets.SUBMODULE_PAT }}
-          submodules: recursive
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rust_target }}
-
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libjavascriptcoregtk-4.1-dev libsoup-3.0-dev
-
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-          key: ${{ matrix.rust_target }}
-
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: lts/*
 
-      - name: Cache frontend dependencies
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lockb') }}
-          restore-keys: bun-${{ runner.os }}-
-
-      - name: Install frontend dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build Tauri app
-        run: bun run tauri build --target ${{ matrix.rust_target }}
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-
-      - name: Find and rename macOS installer
-        if: runner.os == 'macOS'
-        id: macos_installer
+      - name: Verify Release Version
+        id: verify_version
         run: |
-          DMG_DIR="src-tauri/target/${{ matrix.rust_target }}/release/bundle/dmg"
-          DMG_FILE=$(ls "$DMG_DIR"/*.dmg 2>/dev/null | head -n1)
-
-          if [ -z "$DMG_FILE" ]; then
-            echo "::error::No .dmg found in $DMG_DIR"
+          chmod +x scripts/verify_release.sh
+          NEW_VERSION=$(./scripts/verify_release.sh | tail -n 1)
+          if [ $? -ne 0 ]; then
+            echo "Version verification failed!"
             exit 1
           fi
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Extract release notes for the body
+          BODY=$(jq -r '.[0] | "### Features\n" + (.features | map("- " + .) | join("\n")) + "\n\n### Fixes\n" + (.fixes | map("- " + .) | join("\n"))' changelogs/changelogs.json)
+          
+          # Use a multi-line output for the body
+          echo "release_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-          BASENAME=$(basename "$DMG_FILE" .dmg)
-          FINAL_NAME="${BASENAME}-${{ matrix.label }}.dmg"
-          mv "$DMG_FILE" "$DMG_DIR/$FINAL_NAME"
-
-          echo "installer_path=$DMG_DIR/$FINAL_NAME" >> "$GITHUB_OUTPUT"
-
-      - name: Find and rename Windows installer
-        if: runner.os == 'Windows'
-        id: windows_installer
-        shell: bash
+      - name: Bump Version and Commit
         run: |
-          NSIS_DIR="src-tauri/target/${{ matrix.rust_target }}/release/bundle/nsis"
-          EXE_FILE=$(ls "$NSIS_DIR"/*.exe 2>/dev/null | head -n1)
+          NEW_VERSION=${{ steps.verify_version.outputs.new_version }}
+          
+          # Bump package.json
+          jq ".version = \"$NEW_VERSION\"" package.json > package.json.tmp && mv package.json.tmp package.json
+          
+          # Bump src-tauri/tauri.conf.json
+          jq ".version = \"$NEW_VERSION\"" src-tauri/tauri.conf.json > src-tauri/tauri.conf.json.tmp && mv src-tauri/tauri.conf.json.tmp src-tauri/tauri.conf.json
+          
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json src-tauri/tauri.conf.json
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+          git push
 
-          if [ -z "$EXE_FILE" ]; then
-            echo "::error::No .exe found in $NSIS_DIR"
-            exit 1
-          fi
-
-          BASENAME=$(basename "$EXE_FILE" .exe)
-          FINAL_NAME="${BASENAME}-${{ matrix.label }}.exe"
-          mv "$EXE_FILE" "$NSIS_DIR/$FINAL_NAME"
-
-          echo "installer_path=$NSIS_DIR/$FINAL_NAME" >> "$GITHUB_OUTPUT"
-
-      - name: Find and rename Linux installers
-        if: runner.os == 'Linux'
-        id: linux_installer
-        run: |
-          # Handle .deb
-          DEB_DIR="src-tauri/target/${{ matrix.rust_target }}/release/bundle/deb"
-          DEB_FILE=$(ls "$DEB_DIR"/*.deb 2>/dev/null | head -n1)
-          if [ -n "$DEB_FILE" ]; then
-            BASENAME=$(basename "$DEB_FILE" .deb)
-            FINAL_DEB="${BASENAME}-${{ matrix.label }}.deb"
-            mv "$DEB_FILE" "$DEB_DIR/$FINAL_DEB"
-            echo "deb_path=$DEB_DIR/$FINAL_DEB" >> "$GITHUB_OUTPUT"
-          fi
-
-          # Handle .AppImage
-          APPIMAGE_DIR="src-tauri/target/${{ matrix.rust_target }}/release/bundle/appimage"
-          APPIMAGE_FILE=$(ls "$APPIMAGE_DIR"/*.AppImage 2>/dev/null | head -n1)
-          if [ -n "$APPIMAGE_FILE" ]; then
-            BASENAME=$(basename "$APPIMAGE_FILE" .AppImage)
-            FINAL_APPIMAGE="${BASENAME}-${{ matrix.label }}.AppImage"
-            mv "$APPIMAGE_FILE" "$APPIMAGE_DIR/$FINAL_APPIMAGE"
-            echo "appimage_path=$APPIMAGE_DIR/$FINAL_APPIMAGE" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: cf-studio-${{ matrix.label }}
-          path: |
-            ${{ steps.macos_installer.outputs.installer_path }}
-            ${{ steps.windows_installer.outputs.installer_path }}
-            ${{ steps.linux_installer.outputs.deb_path }}
-            ${{ steps.linux_installer.outputs.appimage_path }}
-          if-no-files-found: error
-
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ needs.version.outputs.new_version }}"
-          files: |
-            ${{ steps.macos_installer.outputs.installer_path }}
-            ${{ steps.windows_installer.outputs.installer_path }}
-            ${{ steps.linux_installer.outputs.deb_path }}
-            ${{ steps.linux_installer.outputs.appimage_path }}
-
-
-  post_release:
-    needs: [version, build]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+  build:
+    needs: prepare
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          submodules: recursive
-          token: ${{ secrets.SUBMODULE_PAT }}
+          ref: main # Pull the latest changes (including the version bump)
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
 
-      - name: Update static config version
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-latest'
         run: |
-          # 1. Update config.json in the submodule
-          cd src/pro_modules
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # Checkout submodule default branch
-          git fetch origin main || git fetch origin master
-          git checkout main || git checkout master
-          git pull origin HEAD
-          
-          # Update config.json
-          jq --arg v "${{ needs.version.outputs.new_version }}" \
-            '.current_version = $v' static/config.json > config.tmp.json \
-            && mv config.tmp.json static/config.json
-            
-          # Commit and push submodule using the checked out credentials
-          git add static/config.json
-          git commit -m "chore: update config.json version to v${{ needs.version.outputs.new_version }} [skip ci]" || echo "No changes to commit"
-          git push origin HEAD
-          
-          # 2. Update the parent repository to track the new submodule commit
-          cd ../..
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          git fetch origin main
-          git checkout main
-          git pull origin main
-          
-          git add src/pro_modules
-          git commit -m "chore: update pro_modules submodule [skip ci]" || echo "No submodule change"
-          git push origin main
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build and Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v${{ needs.prepare.outputs.new_version }}
+          releaseName: "v${{ needs.prepare.outputs.new_version }}"
+          releaseBody: ${{ needs.prepare.outputs.release_body }}
+          releaseDraft: false
+          prerelease: false
