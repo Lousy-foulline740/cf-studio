@@ -19,7 +19,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-          token: ${{ secrets.SUBMODULE_PAT || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SUBMODULE_PAT }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
