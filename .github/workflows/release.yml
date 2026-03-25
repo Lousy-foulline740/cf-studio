@@ -46,8 +46,21 @@ jobs:
           
           # Extract release notes
           BODY=$(jq -r '.[0] | "### Features\n" + (.features | map("- " + .) | join("\n")) + "\n\n### Fixes\n" + (.fixes | map("- " + .) | join("\n"))' changelogs/changelogs.json)
+          
+          NOTES=$(cat <<EOF
+
+---
+### macOS Note
+You may need to run this command in your terminal after first open if getting any issue:
+\`xattr -cr /Applications/CF\ Studio.app\`
+
+### Windows Note
+Windows SmartScreen may show a warning — click "More info" → "Run anyway" to proceed.
+EOF
+)
           echo "release_body<<EOF" >> $GITHUB_OUTPUT
           echo "$BODY" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Bump Version and Commit
