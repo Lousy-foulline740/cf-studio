@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-shell";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useAppStore } from "@/store/useAppStore";
 import { useTheme } from "@/components/ThemeProvider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -322,37 +322,45 @@ export function SettingsView() {
                       )}
                     </div>
                     
-                    <div className="w-full max-w-sm space-y-4">
-                      {update?.isManualDetection && (
-                        <div className="p-3 bg-primary/10 border border-primary/20 rounded-xl space-y-2">
-                          <p className="text-[10px] font-bold text-primary uppercase tracking-wider text-center">Manual Update Required</p>
-                          <code className="block text-[10px] bg-background/50 p-2 rounded border border-border/50 break-all select-all text-center">
-                            {update.installCommand}
-                          </code>
-                        </div>
-                      )}
-                      
+                    <div className="w-full max-w-sm">
                       {status === "downloading" ? (
-                        <div className="space-y-2">
-                           <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                        <div className="space-y-3">
+                           <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                               <div className="h-full bg-primary transition-all duration-300" style={{ width: `${downloadProgress}%` }} />
                            </div>
-                           <p className="text-xs text-center text-muted-foreground">Downloading update... {downloadProgress}%</p>
+                           <p className="text-xs text-center font-medium text-primary">Installing update... {downloadProgress}%</p>
                         </div>
                       ) : (
                         <Button 
-                          className="w-full rounded-xl h-11 text-base font-semibold" 
-                          onClick={() => status === "available" ? downloadUpdate() : checkForUpdates()}
-                          disabled={status === "checking" || (status === "available" && update?.isManualDetection)}
+                          className="w-full rounded-xl h-12 text-base font-bold shadow-lg shadow-primary/10 transition-all active:scale-[0.98]" 
+                          variant={status === "available" ? "default" : "secondary"}
+                          disabled={status === "checking"}
+                          onClick={() => {
+                            if (status === "available") {
+                              if (update?.isManualDetection) {
+                                // For manual fallback, open the release page
+                                openUrl("https://github.com/mubashardev/cf-studio/releases/latest");
+                              } else {
+                                downloadUpdate();
+                              }
+                            } else {
+                              checkForUpdates();
+                            }
+                          }}
                         >
-                          {status === "available" ? (
+                          {status === "checking" ? (
+                            <>
+                              <RefreshCw size={18} className="mr-2 animate-spin" />
+                              Checking...
+                            </>
+                          ) : status === "available" ? (
                             <>
                               <Download size={18} className="mr-2" />
-                              {update?.isManualDetection ? "Manual Update Ready" : `Update to v${update?.version} Now`}
+                              {update?.isManualDetection ? "Download Update" : "Install Update"}
                             </>
                           ) : (
                             <>
-                              <RefreshCw size={18} className={cn("mr-2", status === "checking" && "animate-spin")} />
+                              <RefreshCw size={18} className="mr-2" />
                               Check for Updates
                             </>
                           )}
