@@ -98,6 +98,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: main
           submodules: recursive
           token: ${{ secrets.SUBMODULE_PAT != '' && secrets.SUBMODULE_PAT || secrets.GITHUB_TOKEN }}
           persist-credentials: true
