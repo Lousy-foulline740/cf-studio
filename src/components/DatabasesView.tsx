@@ -3,7 +3,7 @@
 // D1 Databases listing page — auto-fetches from the Cloudflare API.
 // Clicking a row drills into DatabaseExplorer for schema inspection.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RefreshCw, Database, Terminal, AlertCircle, Loader2, HardDrive, ChevronRight, History } from "lucide-react";
 import {
   Table,
@@ -21,7 +21,6 @@ import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { useD1Databases, type D1Database, invokeCloudflare } from "@/hooks/useCloudflare";
 import { DatabaseExplorer } from "@/components/DatabaseExplorer";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { useEffect, useState } from "react";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
