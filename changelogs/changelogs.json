@@ -5,7 +5,9 @@
     "features": [
       "Added D1 Query History feature with statistics to track usage perfectly"
     ],
-    "fixes": []
+    "fixes": [
+      
+    ]
   },
   {
     "version": "1.1.2",
