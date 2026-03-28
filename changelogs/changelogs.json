@@ -2,7 +2,9 @@
   {
     "version": "1.1.4",
     "date": "2026-03-29",
-    "features": [],
+    "features": [
+      
+    ],
     "fixes": [
       "Fixed Windows build error"
     ]
