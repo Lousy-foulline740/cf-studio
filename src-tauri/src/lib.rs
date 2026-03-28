@@ -54,7 +54,6 @@ fn greet(name: &str) -> String {
 
 // ── Tauri App Entry Point ──────────────────────────────────────────────────────
 
-use std::process::Command;
 
 #[tauri::command]
 async fn download_update_binary(
@@ -106,7 +105,8 @@ async fn download_update_binary(
     #[cfg(target_os = "windows")]
     {
         let _ = std::process::Command::new("cmd")
-            .args(["/C", "start", "", &dest_path])
+            .args(["/C", "start", ""])
+            .arg(&dest_path)
             .spawn();
     }
 

@@ -35,49 +35,86 @@ jobs:
           ./scripts/verify_release.sh > verification_output.log 2>&1
           EXIT_CODE=$?
           cat verification_output.log
-          
+
           if [ $EXIT_CODE -ne 0 ]; then
             echo "Version verification failed!"
             exit 1
           fi
-          
+
           NEW_VERSION=$(tail -n 1 verification_output.log)
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          
+
           # Generate release body
           {
             echo "release_body<<EOF"
-            echo "### Features"
-            jq -r '.[0].features | map("- " + .) | join("\n")' changelogs/changelogs.json
+            
+            HAS_FEATURES=$(jq '.[0].features | length' changelogs/changelogs.json)
+            if [ "$HAS_FEATURES" -gt 0 ]; then
+              echo "### Features"
+              jq -r '.[0].features[]' changelogs/changelogs.json | sed 's/^/- /'
+              echo ""
+            fi
+
+            HAS_FIXES=$(jq '.[0].fixes | length' changelogs/changelogs.json)
+            if [ "$HAS_FIXES" -gt 0 ]; then
+              echo "### Fixes"
+              jq -r '.[0].fixes[]' changelogs/changelogs.json | sed 's/^/- /'
+              echo ""
+            fi
+
+            echo "### Quick Install"
             echo ""
-            echo "### Fixes"
-            jq -r '.[0].fixes | map("- " + .) | join("\n")' changelogs/changelogs.json
+            echo "**For macOS/Linux (Bash Terminal):**"
+            echo "\`\`\`bash"
+            echo "curl -fsSL https://install.cfstudio.dev | bash"
+            echo "\`\`\`"
+            echo ""
+            echo "**For Windows (PowerShell):**"
+            echo "\`\`\`powershell"
+            echo "irm https://install.cfstudio.dev | iex"
+            echo "\`\`\`"
+            echo ""
+
+            echo "### Manual Downloads"
+            echo ""
+            echo "| Platform | Architecture | File |"
+            echo "| :--- | :--- | :--- |"
+            echo "| **macOS** | Apple Silicon (M1/M2/M3/M4) | \`CF-Studio-$NEW_VERSION-apple_silicon.dmg\` |"
+            echo "| **macOS** | Intel | \`CF-Studio-$NEW_VERSION-intel_chip.dmg\` |"
+            echo "| **Windows** | x64 | \`CF-Studio-$NEW_VERSION-windows_x64.exe\` |"
+            echo "| **Linux** | x86_64 | \`CF-Studio-$NEW_VERSION-linux_x64.{deb,AppImage}\` |"
+            echo "| **Linux** | ARM64 | \`CF-Studio-$NEW_VERSION-linux_arm64.{deb,AppImage}\` |"
             echo ""
             echo "---"
+            echo ""
             echo "### macOS Note"
-            echo "You may need to run this command in your terminal after first open if getting any issue:"
+            echo "*You may need to run this command in your terminal after first open if getting any issue:*"
+            echo ""
             echo "\`xattr -cr /Applications/CF\ Studio.app\`"
             echo ""
             echo "### Windows Note"
-            echo "Windows SmartScreen may show a warning — click \"More info\" → \"Run anyway\" to proceed."
+            echo "*Windows SmartScreen may show a warning — click **\"More info\"** → **\"Run anyway\"** to proceed.*"
+            echo ""
+            echo "*PowerShell command to unblock the installer (if needed):*"
+            echo "\`Unblock-File -Path \"\$HOME\Downloads\CF-Studio-$NEW_VERSION-windows_x64.exe\"\`"
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
       - name: Bump Version and Commit
         run: |
           NEW_VERSION=${{ steps.verify_version.outputs.new_version }}
-          
+
           # Bump manifests
           jq ".version = \"$NEW_VERSION\"" package.json > package.json.tmp && mv package.json.tmp package.json
           jq ".version = \"$NEW_VERSION\"" src-tauri/tauri.conf.json > src-tauri/tauri.conf.json.tmp && mv src-tauri/tauri.conf.json.tmp src-tauri/tauri.conf.json
-          
+
           # Update Cargo.toml version
           sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" src-tauri/Cargo.toml
-          
+
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml
-          
+
           if ! git diff --cached --exit-code; then
             git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
             git push
@@ -119,6 +156,38 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Tauri App
+        run: bun tauri build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rename and Prepare Assets
+        shell: bash
+        run: |
+          VERSION=${{ needs.prepare.outputs.new_version }}
+          
+          if [ "${{ matrix.platform }}" == "windows-latest" ]; then
+            # Windows NSIS
+            DIR="src-tauri/target/release/bundle/nsis"
+            [ -d "$DIR" ] && mv "$DIR"/*.exe "$DIR/CF-Studio-$VERSION-windows_x64.exe" || true
+          elif [ "${{ matrix.platform }}" == "macos-latest" ]; then
+            # macOS DMG
+            DIR="src-tauri/target/release/bundle/dmg"
+            if [ -d "$DIR" ]; then
+                # Create copies for both silicon and intel to match the table
+                FILE=$(find "$DIR" -name "*.dmg" | head -n 1)
+                cp "$FILE" "$DIR/CF-Studio-$VERSION-apple_silicon.dmg"
+                mv "$FILE" "$DIR/CF-Studio-$VERSION-intel_chip.dmg"
+            fi
+          elif [ "${{ matrix.platform }}" == "ubuntu-latest" ]; then
+            # Linux DEB and AppImage
+            DEB_DIR="src-tauri/target/release/bundle/deb"
+            [ -d "$DEB_DIR" ] && mv "$DEB_DIR"/*.deb "$DEB_DIR/CF-Studio-$VERSION-linux_x64.deb" || true
+            
+            APP_DIR="src-tauri/target/release/bundle/appimage"
+            [ -d "$APP_DIR" ] && mv "$APP_DIR"/*.AppImage "$APP_DIR/CF-Studio-$VERSION-linux_x64.AppImage" || true
+          fi
 
       - name: Build and Release
         uses: tauri-apps/tauri-action@v0

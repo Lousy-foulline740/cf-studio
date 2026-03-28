@@ -6,12 +6,12 @@ A blazing-fast, native desktop client for Cloudflare D1 and R2.
 
 ## Install
 
-For macOS/Linux:
+For macOS/Linux (Bash Terminal):
 ```bash
 curl -fsSL https://install.cfstudio.dev | bash
 ```
 
-For Windows:
+For Windows (PowerShell):
 ```powershell
 irm https://install.cfstudio.dev | iex
 ```
