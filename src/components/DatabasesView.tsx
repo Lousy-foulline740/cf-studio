@@ -4,6 +4,7 @@
 // Clicking a row drills into DatabaseExplorer for schema inspection.
 
 import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, Database, Terminal, AlertCircle, Loader2, HardDrive, ChevronRight, History } from "lucide-react";
 import {
   Table,
@@ -21,6 +22,9 @@ import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { useD1Databases, type D1Database, invokeCloudflare } from "@/hooks/useCloudflare";
 import { DatabaseExplorer } from "@/components/DatabaseExplorer";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useFeatureFlags } from "@/hooks/useFeatureFlags";
+import { useToast } from "@/components/ui/use-toast";
+import { ProFeatureGate } from "@/pro_modules/frontend/ProFeatureGate";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -265,10 +269,13 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
   const { state, refresh } = useD1Databases();
   const activeAccount = useAppStore((s) => s.activeAccount);
   const isLoading = state.status === "loading" || state.status === "idle";
+  const { isProBuild, enableD1History } = useFeatureFlags();
   const [hasProHistory, setHasProHistory] = useState(false);
+  const [isPurchaseOpen, setIsPurchaseOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Check if the Pro History module exists
+    // Check if the Pro History module exists on disk (compilation check)
     import("@/pro_modules/ui/ActivityDashboard")
       .then(() => setHasProHistory(true))
       .catch(() => setHasProHistory(false));
@@ -285,11 +292,33 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          {hasProHistory && (
+          <div className="relative">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => {
+                  if (!isProBuild) {
+                      toast({
+                          title: "Advanced History Required",
+                          description: "This feature is only available in the official CF Studio Pro version.",
+                          variant: "destructive",
+                      });
+                      return;
+                  }
+                  
+                  if (!enableD1History) {
+                      setIsPurchaseOpen(true);
+                      return;
+                  }
+
+                  if (!hasProHistory) {
+                      toast({
+                        title: "Module Missing",
+                        description: "The History UI module was not found in this build.",
+                        variant: "destructive",
+                      });
+                      return;
+                  }
                   console.log("Opening history window...");
                   const storedTheme = localStorage.getItem("cf-studio-theme") || "dark";
                   const historyUrl = `index.html?theme=${encodeURIComponent(storedTheme)}`;
@@ -318,12 +347,17 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
                      });
                   });
               }}
-              title="Query History"
+              title={isProBuild && enableD1History && hasProHistory ? "Query History" : "Query History (Pro)"}
               className="text-muted-foreground hover:text-foreground"
             >
               <History size={15} strokeWidth={2} />
             </Button>
-          )}
+            {(!isProBuild || !enableD1History || !hasProHistory) && (
+              <span className="absolute -top-1 -right-1 px-1 bg-amber-500 text-[8px] font-bold text-white rounded-sm pointer-events-none scale-75 uppercase">
+                Pro
+              </span>
+            )}
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -399,6 +433,11 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
           </div>
         )}
       </div>
+
+      <ProFeatureGate 
+        isOpen={isPurchaseOpen} 
+        onClose={() => setIsPurchaseOpen(false)} 
+      />
     </div>
   );
 }
