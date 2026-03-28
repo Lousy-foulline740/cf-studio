@@ -4,7 +4,6 @@
 // Clicking a row drills into DatabaseExplorer for schema inspection.
 
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { RefreshCw, Database, Terminal, AlertCircle, Loader2, HardDrive, ChevronRight, History } from "lucide-react";
 import {
   Table,
@@ -22,7 +21,6 @@ import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { useD1Databases, type D1Database, invokeCloudflare } from "@/hooks/useCloudflare";
 import { DatabaseExplorer } from "@/components/DatabaseExplorer";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 import { useToast } from "@/components/ui/use-toast";
 import { ProFeatureGate } from "@/pro_modules/frontend/ProFeatureGate";
 
@@ -268,8 +266,9 @@ interface DatabaseListProps {
 function DatabaseList({ onSelect }: DatabaseListProps) {
   const { state, refresh } = useD1Databases();
   const activeAccount = useAppStore((s) => s.activeAccount);
+  const isProBuild = useAppStore((s) => s.isProBuild);
+  const enableD1History = useAppStore((s) => s.enableD1History);
   const isLoading = state.status === "loading" || state.status === "idle";
-  const { isProBuild, enableD1History } = useFeatureFlags();
   const [hasProHistory, setHasProHistory] = useState(false);
   const [isPurchaseOpen, setIsPurchaseOpen] = useState(false);
   const { toast } = useToast();
@@ -297,15 +296,6 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
               variant="ghost"
               size="icon"
               onClick={() => {
-                  if (!isProBuild) {
-                      toast({
-                          title: "Advanced History Required",
-                          description: "This feature is only available in the official CF Studio Pro version.",
-                          variant: "destructive",
-                      });
-                      return;
-                  }
-                  
                   if (!enableD1History) {
                       setIsPurchaseOpen(true);
                       return;
@@ -313,8 +303,8 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
 
                   if (!hasProHistory) {
                       toast({
-                        title: "Module Missing",
-                        description: "The History UI module was not found in this build.",
+                        title: "History Feature Required",
+                        description: "This feature is only available in the official CF Studio Pro version.",
                         variant: "destructive",
                       });
                       return;
@@ -347,12 +337,12 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
                      });
                   });
               }}
-              title={isProBuild && enableD1History && hasProHistory ? "Query History" : "Query History (Pro)"}
+              title={enableD1History && hasProHistory ? "Query History" : "Query History (Pro)"}
               className="text-muted-foreground hover:text-foreground"
             >
               <History size={15} strokeWidth={2} />
             </Button>
-            {(!isProBuild || !enableD1History || !hasProHistory) && (
+            {(!enableD1History || !hasProHistory) && (
               <span className="absolute -top-1 -right-1 px-1 bg-amber-500 text-[8px] font-bold text-white rounded-sm pointer-events-none scale-75 uppercase">
                 Pro
               </span>
@@ -437,6 +427,7 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
       <ProFeatureGate 
         isOpen={isPurchaseOpen} 
         onClose={() => setIsPurchaseOpen(false)} 
+        featureName="history"
       />
     </div>
   );

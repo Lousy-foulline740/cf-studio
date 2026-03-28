@@ -1,7 +1,6 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { type D1QueryResult } from "@/hooks/useCloudflare";
 import { useAppStore } from "@/store/useAppStore";
-import { useFeatureFlags } from "@/hooks/useFeatureFlags";
 
 export type ExecutionSource = "UI_ACTION" | "RAW_QUERY";
 
@@ -27,24 +26,26 @@ export function useD1Tracker() {
   const saveQueryResultsEnabled = useAppStore((state) => state.saveQueryResultsEnabled);
   const saveQueryResultsRowLimit = useAppStore((state) => state.saveQueryResultsRowLimit);
 
-  const { isProBuild, enableD1History, isLoading: flagsLoading } = useFeatureFlags();
+  const isProBuild = useAppStore((state) => state.isProBuild);
+  const enableD1History = useAppStore((state) => state.enableD1History);
+  const flagsLoading = useAppStore((state) => state.isFlagsLoading);
 
   useEffect(() => {
-    // If pro build is detected, preload the logic module
-    if (isProBuild) {
+    // Preload the logic module if history is enabled in config
+    if (enableD1History) {
         import("@/pro_modules/hooks/useD1TrackerLogic")
           .then(m => { proLogic = m.executeTrackedQueryWithLogic; })
           .catch(() => {});
     }
-  }, [isProBuild]);
+  }, [enableD1History]);
 
   const executeTrackedQuery = useCallback(
     async (
       options: TrackedQueryOptions,
       executeNetworkCall: () => Promise<D1QueryResult[]>
     ): Promise<D1QueryResult[]> => {
-      // 1. If not a Pro build or disabled by remote config, runNormally
-      if (flagsLoading || !isProBuild || !enableD1History) {
+      // 1. If disabled by remote config, run normally
+      if (flagsLoading || !enableD1History) {
         return await executeNetworkCall();
       }
 

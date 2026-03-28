@@ -83,6 +83,11 @@ interface AppState {
   /** Unix timestamp (ms) of the last successful R2 buckets fetch, or null. */
   r2LastFetched: number | null;
 
+  // ── Feature Flags (Volatile, not persisted) ──
+  isProBuild: boolean;
+  enableD1History: boolean;
+  isFlagsLoading: boolean;
+
   // ── Session Cache (Volatile, not persisted) ──
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   queryCache: Record<string, { data: any; timestamp: number }>;
@@ -107,6 +112,7 @@ interface AppState {
   setUpdateData: (data: any | null) => void;
   setDownloadProgress: (progress: number) => void;
   setUpdateError: (error: string | null) => void;
+  checkFeatureFlags: () => Promise<void>;
 
   /** Overwrite the databases list and stamp the fetch time. */
   setDatabases: (databases: D1Database[]) => void;
@@ -165,6 +171,11 @@ export const useAppStore = create<AppState>()(
       r2LastFetched: null,
       queryCache: {},
       sessionId: crypto.randomUUID(),
+
+      // ── Feature Flags ──
+      isProBuild: false,
+      enableD1History: false,
+      isFlagsLoading: true,
 
       // ── Actions ──
       setUserProfile: (profile) => set({ userProfile: profile }),
@@ -225,6 +236,36 @@ export const useAppStore = create<AppState>()(
           }
           return { queryCache: next };
         }),
+
+      checkFeatureFlags: async () => {
+        const { invoke } = await import("@tauri-apps/api/core");
+        try {
+          // 1. Check if the Rust backend has 'pro' features compiled in
+          const isProBuild = await invoke<boolean>("is_pro_enabled").catch(() => false);
+          let enableD1History = false;
+
+          // 2. Fetch the remote config for specific feature toggles (regardless of build type)
+          try {
+            const response = await fetch('https://pro.cfstudio.dev/config.json?t=' + Date.now(), {
+              cache: 'no-store'
+            });
+            if (response.ok) {
+              const config = await response.json();
+              enableD1History = config.enable_d1_query_history === true;
+            }
+          } catch (e) {
+            console.error("Failed to fetch remote Pro config:", e);
+          }
+
+          set({
+            isProBuild,
+            enableD1History,
+            isFlagsLoading: false,
+          });
+        } catch (e) {
+          set({ isProBuild: false, enableD1History: false, isFlagsLoading: false });
+        }
+      },
     }),
     {
       name: "cf-studio-cache",          // localStorage key

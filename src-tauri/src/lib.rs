@@ -9,7 +9,6 @@ pub mod setup;
 pub mod user;
 pub mod db;
 
-#[cfg(feature = "pro")]
 #[path = "../../src/pro_modules/rust/history.rs"]
 pub mod history_pro;
 
@@ -182,18 +181,13 @@ pub fn run() {
             setup::install_dependencies,
             download_update_binary,
 
-            // ── History Commands (Conditional) ──
+            // ── History Commands (Gated by remote config on frontend) ──
             is_pro_enabled,
 
-            #[cfg(feature = "pro")]
             history_pro::save_query_history,
-            #[cfg(feature = "pro")]
             history_pro::get_paginated_history,
-            #[cfg(feature = "pro")]
             history_pro::get_global_stats,
-            #[cfg(feature = "pro")]
             history_pro::clear_query_history,
-            #[cfg(feature = "pro")]
             history_pro::get_history_debug_status,
         ])
         .run(tauri::generate_context!())

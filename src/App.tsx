@@ -4,6 +4,7 @@ import { SetupWizard } from "@/components/SetupWizard";
 import { Toaster } from "@/components/ui/toaster";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useAppStore } from "@/store/useAppStore";
 
 // Dynamic import for Pro-only ActivityDashboard
 const ActivityDashboard = lazy(() => 
@@ -24,6 +25,7 @@ function App() {
 
   useEffect(() => {
     setWindowLabel(getCurrentWindow().label);
+    useAppStore.getState().checkFeatureFlags();
   }, []);
 
   if (windowLabel === null) {
