@@ -65,6 +65,8 @@ interface AppState {
   autoUpdate: boolean;
   isRefreshingSession: boolean;
   privacySettings: PrivacySettings;
+  saveQueryResultsEnabled: boolean;
+  saveQueryResultsRowLimit: number | null;
 
   // ── Updater State ──
   updateStatus: "idle" | "checking" | "available" | "downloading" | "up-to-date" | "error";
@@ -96,6 +98,8 @@ interface AppState {
   setShowTableColumnCounts: (show: boolean) => void;
   setAutoUpdate: (enabled: boolean) => void;
   setPrivacySettings: (settings: Partial<PrivacySettings>) => void;
+  setSaveQueryResultsEnabled: (enabled: boolean) => void;
+  setSaveQueryResultsRowLimit: (limit: number | null) => void;
   setSessionId: (id: string) => void;
   refreshSession: () => void;
   
@@ -150,6 +154,8 @@ export const useAppStore = create<AppState>()(
         r2BucketNames: true,
         r2FileNames: true,
       },
+      saveQueryResultsEnabled: false,
+      saveQueryResultsRowLimit: 50,
       updateStatus: "idle",
       updateData: null,
       downloadProgress: 0,
@@ -170,6 +176,8 @@ export const useAppStore = create<AppState>()(
       setShowTableColumnCounts: (show) => set({ showTableColumnCounts: show }),
       setAutoUpdate: (enabled) => set({ autoUpdate: enabled }),
       setPrivacySettings: (settings) => set((s) => ({ privacySettings: { ...s.privacySettings, ...settings } })),
+      setSaveQueryResultsEnabled: (enabled) => set({ saveQueryResultsEnabled: enabled }),
+      setSaveQueryResultsRowLimit: (limit) => set({ saveQueryResultsRowLimit: limit }),
       setSessionId: (id) => set({ sessionId: id }),
       refreshSession: () => set({ sessionId: crypto.randomUUID() }),
       setUpdateStatus: (status) => set({ updateStatus: status }),
@@ -230,6 +238,8 @@ export const useAppStore = create<AppState>()(
         tableDensity: state.tableDensity,
         autoUpdate: state.autoUpdate,
         privacySettings: state.privacySettings,
+        saveQueryResultsEnabled: state.saveQueryResultsEnabled,
+        saveQueryResultsRowLimit: state.saveQueryResultsRowLimit,
         databases: state.databases,
         kvNamespaces: state.kvNamespaces,
         r2Buckets: state.r2Buckets,

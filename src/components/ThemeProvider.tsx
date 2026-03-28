@@ -5,6 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { emit, listen } from "@tauri-apps/api/event";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 export type Theme = "light" | "dark" | "system";
@@ -32,18 +33,27 @@ export function ThemeProvider({
   defaultTheme = "dark",
   storageKey = "cf-studio-theme",
 }: ThemeProviderProps) {
+  const getInitialTheme = (): Theme => {
+    const param = new URLSearchParams(window.location.search).get("theme");
+    if (param === "light" || param === "dark" || param === "system") {
+      return param;
+    }
+    const stored = localStorage.getItem(storageKey) as Theme | null;
+    return stored ?? defaultTheme;
+  };
+
   const [theme, setThemeState] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) ?? defaultTheme
+    () => getInitialTheme()
   );
 
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => {
-    const stored = (localStorage.getItem(storageKey) as Theme) ?? defaultTheme;
-    if (stored === "system") {
+    const initial = getInitialTheme();
+    if (initial === "system") {
       return window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light";
     }
-    return stored;
+    return initial;
   });
 
   useEffect(() => {
@@ -73,9 +83,21 @@ export function ThemeProvider({
     }
   }, [theme]);
 
+  useEffect(() => {
+    const unlistenPromise = listen<{ theme: Theme }>("cf-theme-changed", (event) => {
+      const next = event.payload.theme;
+      localStorage.setItem(storageKey, next);
+      setThemeState(next);
+    });
+    return () => {
+      void unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [storageKey]);
+
   const setTheme = (next: Theme) => {
     localStorage.setItem(storageKey, next);
     setThemeState(next);
+    void emit("cf-theme-changed", { theme: next });
   };
 
   return (

@@ -23,13 +23,16 @@ import {
   Globe,
   Mail,
   User,
-  ArrowRight
+  ArrowRight,
+  AlertTriangle,
+  Database
 } from "lucide-react";
 import appVersion from "../../package.json";
 import changelogsData from "../../changelogs/changelogs.json";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import { useUpdater } from "@/hooks/useUpdater";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -47,6 +50,10 @@ export function SettingsView() {
   const setShowTableColumnCounts = useAppStore(s => s.setShowTableColumnCounts);
   const autoUpdate = useAppStore(s => s.autoUpdate);
   const setAutoUpdate = useAppStore(s => s.setAutoUpdate);
+  const saveQueryResultsEnabled = useAppStore(s => s.saveQueryResultsEnabled);
+  const setSaveQueryResultsEnabled = useAppStore(s => s.setSaveQueryResultsEnabled);
+  const saveQueryResultsRowLimit = useAppStore(s => s.saveQueryResultsRowLimit);
+  const setSaveQueryResultsRowLimit = useAppStore(s => s.setSaveQueryResultsRowLimit);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   const { toast } = useToast();
@@ -101,6 +108,10 @@ export function SettingsView() {
             <TabsTrigger value="appearance" className="w-full justify-start gap-2 h-10 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all">
               <Palette size={16} />
               Appearance
+            </TabsTrigger>
+            <TabsTrigger value="d1" className="w-full justify-start gap-2 h-10 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all">
+              <Database size={16} />
+              D1 Database
             </TabsTrigger>
             <TabsTrigger value="privacy" className="w-full justify-start gap-2 h-10 px-4 data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all">
               <Shield size={16} />
@@ -184,6 +195,7 @@ export function SettingsView() {
                   </div>
                 </CardContent>
               </Card>
+
             </TabsContent>
 
             {/* Appearance Tab */}
@@ -257,6 +269,84 @@ export function SettingsView() {
                       <p className="text-xs text-muted-foreground font-mono italic">Show table column metrics in sidebar</p>
                     </div>
                     <Switch checked={showTableColumnCounts} onCheckedChange={setShowTableColumnCounts} />
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* D1 Database Tab */}
+            <TabsContent value="d1" className="m-0 space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              <Card className="border-none shadow-md bg-muted/20">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg">Query History</CardTitle>
+                  <CardDescription>Control whether D1 query results are stored in history.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Save Query Results</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Store result rows alongside each history entry for later review.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={saveQueryResultsEnabled}
+                      onCheckedChange={(enabled) => setSaveQueryResultsEnabled(!!enabled)}
+                    />
+                  </div>
+
+                  <div className={cn("grid gap-4 transition-all duration-300", !saveQueryResultsEnabled && "opacity-40 grayscale pointer-events-none")}>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-sm font-medium">Rows Saved Per Query</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Limit how many rows are stored for each query result.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min={1}
+                            step={1}
+                            value={saveQueryResultsRowLimit ?? 50}
+                            onChange={(e) => {
+                              const next = Number.parseInt(e.target.value, 10);
+                              if (!Number.isFinite(next)) return;
+                              setSaveQueryResultsRowLimit(Math.max(1, next));
+                            }}
+                            className="h-9 w-24 text-right"
+                            disabled={saveQueryResultsRowLimit == null}
+                          />
+                          <span className="text-xs text-muted-foreground">rows</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-muted-foreground">No limit</Label>
+                          <Switch
+                            checked={saveQueryResultsRowLimit == null}
+                            onCheckedChange={(checked) =>
+                              setSaveQueryResultsRowLimit(checked ? null : 50)
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-amber-600">
+                      <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                      <p className="text-xs">
+                        Saving query results increases local app size over time. Large result sets can grow storage quickly.
+                      </p>
+                    </div>
+
+                    {saveQueryResultsRowLimit == null && (
+                      <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-red-500">
+                        <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                        <p className="text-xs">
+                          No limit can consume a lot of disk space. Use with caution.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

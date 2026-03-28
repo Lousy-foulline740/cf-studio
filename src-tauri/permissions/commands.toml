@@ -29,6 +29,12 @@ commands.allow = [
     "check_dependencies",
     "install_dependencies",
     "download_update_binary"
+    ,
+    "save_query_history",
+    "get_paginated_history",
+    "get_global_stats",
+    "clear_query_history",
+    "get_history_debug_status"
 ]
 
 [[permission]]

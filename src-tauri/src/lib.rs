@@ -7,7 +7,11 @@ pub mod r2;
 pub mod r2_pro;
 pub mod setup;
 pub mod user;
-pub mod history;
+pub mod db;
+
+#[cfg(feature = "pro")]
+#[path = "../../src/pro_modules/rust/history.rs"]
+pub mod history_pro;
 
 use cloudflare_auth::{read_credentials, AuthError, CloudflareCredentials};
 use std::sync::Arc;
@@ -131,7 +135,7 @@ pub fn run() {
         .manage(UploadState::default())
         .setup(|app| {
             cloudflare_auth::start_wrangler_watcher(app.handle().clone());
-            match history::init_db(app.handle()) {
+            match db::init_db(app.handle()) {
                 Ok(db_state) => { app.manage(db_state); },
                 Err(e) => eprintln!("Failed to initialize query history database: {}", e),
             }
@@ -169,10 +173,18 @@ pub fn run() {
             setup::check_dependencies,
             setup::install_dependencies,
             download_update_binary,
-            history::save_query_history,
-            history::get_paginated_history,
-            history::get_global_stats,
-            history::clear_query_history,
+
+            // ── Pro History Commands ──
+            #[cfg(feature = "pro")]
+            history_pro::save_query_history,
+            #[cfg(feature = "pro")]
+            history_pro::get_paginated_history,
+            #[cfg(feature = "pro")]
+            history_pro::get_global_stats,
+            #[cfg(feature = "pro")]
+            history_pro::clear_query_history,
+            #[cfg(feature = "pro")]
+            history_pro::get_history_debug_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

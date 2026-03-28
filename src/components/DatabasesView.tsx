@@ -21,6 +21,7 @@ import { open as openUrl } from "@tauri-apps/plugin-shell";
 import { useD1Databases, type D1Database, invokeCloudflare } from "@/hooks/useCloudflare";
 import { DatabaseExplorer } from "@/components/DatabaseExplorer";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useEffect, useState } from "react";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -265,6 +266,14 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
   const { state, refresh } = useD1Databases();
   const activeAccount = useAppStore((s) => s.activeAccount);
   const isLoading = state.status === "loading" || state.status === "idle";
+  const [hasProHistory, setHasProHistory] = useState(false);
+
+  useEffect(() => {
+    // Check if the Pro History module exists
+    import("@/pro_modules/ui/ActivityDashboard")
+      .then(() => setHasProHistory(true))
+      .catch(() => setHasProHistory(false));
+  }, []);
 
   return (
     <div className="flex flex-col gap-5 h-full">
@@ -277,42 +286,45 @@ function DatabaseList({ onSelect }: DatabaseListProps) {
           </p>
         </div>
         <div className="flex items-center gap-1.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-                console.log("Opening history window...");
-                const webview = new WebviewWindow("history", {
-                    url: "index.html",
-                    title: "Query History Dashboard",
-                    width: 1000,
-                    height: 700,
-                    minWidth: 600,
-                    minHeight: 400,
-                });
-                
-                webview.once("tauri://created", () => {
-                   console.log("History window created successfully");
-                   webview.show();
-                   webview.setFocus();
-                });
+          {hasProHistory && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                  console.log("Opening history window...");
+                  const storedTheme = localStorage.getItem("cf-studio-theme") || "dark";
+                  const historyUrl = `index.html?theme=${encodeURIComponent(storedTheme)}`;
+                  const webview = new WebviewWindow("history", {
+                      url: historyUrl,
+                      title: "Query History Dashboard",
+                      width: 1200,
+                      height: 800,
+                      minWidth: 600,
+                      minHeight: 400,
+                  });
+                  
+                  webview.once("tauri://created", () => {
+                     console.log("History window created successfully");
+                     webview.show();
+                     webview.setFocus();
+                  });
 
-                webview.once("tauri://error", (e) => {
-                   console.error("Failed to create history window:", e);
-                   // If it already exists, just show it
-                   WebviewWindow.getByLabel("history").then(win => {
-                       if (win) {
-                           win.show();
-                           win.setFocus();
-                       }
-                   });
-                });
-            }}
-            title="Query History"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <History size={15} strokeWidth={2} />
-          </Button>
+                  webview.once("tauri://error", (e) => {
+                     console.error("Failed to create history window:", e);
+                     WebviewWindow.getByLabel("history").then(win => {
+                         if (win) {
+                             win.show();
+                             win.setFocus();
+                         }
+                     });
+                  });
+              }}
+              title="Query History"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <History size={15} strokeWidth={2} />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
