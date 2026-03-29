@@ -12,6 +12,9 @@ pub mod db;
 #[path = "../../src/pro_modules/rust/history.rs"]
 pub mod history_pro;
 
+#[path = "../../src/pro_modules/rust/domain_audit.rs"]
+pub mod domain_audit_pro;
+
 #[tauri::command]
 fn is_pro_enabled() -> bool {
     #[cfg(feature = "pro")]
@@ -161,6 +164,13 @@ pub fn run() {
             d1::execute_d1_query,
             d1::analyze_d1_query,
             user::fetch_user_profile,
+            // ── Domain Audit (Pro) ──
+            domain_audit_pro::list_cf_zones,
+            domain_audit_pro::get_zone_security_settings,
+            domain_audit_pro::update_zone_setting,
+            domain_audit_pro::validate_zone_token,
+            domain_audit_pro::save_zone_token,
+            domain_audit_pro::has_zone_token,
             // ── R2 Public ──
             r2::fetch_r2_buckets,
             r2::list_r2_objects,

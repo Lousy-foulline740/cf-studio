@@ -83,4 +83,9 @@ impl CloudflareClient {
     pub fn delete(&self, path: &str) -> reqwest::RequestBuilder {
         self.inner.delete(format!("{}/{}", self.base_url, path))
     }
+
+    /// Shorthand: PATCH `{base_url}/{path}`
+    pub fn patch(&self, path: &str) -> reqwest::RequestBuilder {
+        self.inner.patch(format!("{}/{}", self.base_url, path))
+    }
 }

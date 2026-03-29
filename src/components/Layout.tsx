@@ -16,6 +16,10 @@ import {
   Activity,
   ScrollText,
   Github,
+  Globe,
+  Shield,
+  Zap,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme, type Theme } from "@/components/ThemeProvider";
@@ -25,10 +29,13 @@ import { SessionRefreshModal } from "@/components/SessionRefreshModal";
 import { R2BucketsView } from "@/pro_modules/frontend/R2BucketsView";
 import {
   useAppStore,
-  // We need UserProfile type from store
   type UserProfile,
 } from "@/store/useAppStore";
 import { invokeCloudflare, useCloudflareAccounts } from "@/hooks/useCloudflare";
+import { useRemoteConfig } from "@/pro_modules/frontend/useRemoteConfig";
+import { AuditZoneProvider } from "@/pro_modules/frontend/AuditZoneContext";
+import { SecurityPosture } from "@/pro_modules/ui/audits/SecurityPosture";
+import { useMemo } from "react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface NavGroup {
@@ -107,6 +114,7 @@ interface SidebarProps {
   onNavigate: (id: string) => void;
   userProfile: UserProfile | null;
   activeAccount: { id: string; name: string } | null;
+  navGroups: NavGroup[];
 }
 
 function Sidebar({
@@ -115,6 +123,7 @@ function Sidebar({
   onNavigate,
   userProfile,
   activeAccount,
+  navGroups,
 }: SidebarProps) {
   const { theme, setTheme } = useTheme();
   const privacySettings = useAppStore(s => s.privacySettings);
@@ -148,7 +157,7 @@ function Sidebar({
 
       {/* Nav Items */}
       <nav className="flex-1 flex flex-col gap-4 px-1.5 py-4 overflow-y-auto">
-        {NAV_GROUPS.map((group) => (
+        {navGroups.map((group) => (
           <div key={group.label} className="flex flex-col gap-0.5">
             {!collapsed && (
               <span className="px-2 mb-1 text-[10px] uppercase font-bold tracking-widest text-sidebar-foreground/40 shrink-0">
@@ -375,6 +384,16 @@ function PageContent({ activeId }: { activeId: string }) {
   if (activeId === "d1") return <DatabasesView />;
   if (activeId === "r2") return <R2BucketsView />;
   if (activeId === "settings") return <SettingsView />;
+  if (activeId === "audit-security") return <SecurityPosture />;
+  
+  if (activeId.startsWith("audit")) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center gap-2">
+        <p className="text-muted-foreground text-sm">Audit view coming soon</p>
+      </div>
+    );
+  }
+
   // KV and Settings views will be added in subsequent steps
   return (
     <div className="flex flex-col items-center justify-center h-full text-center gap-2">
@@ -391,6 +410,23 @@ export function Layout() {
   const userProfile = useAppStore((s) => s.userProfile);
   const setUserProfile = useAppStore((s) => s.setUserProfile);
   const activeAccount = useAppStore((s) => s.activeAccount);
+  const { data: config } = useRemoteConfig();
+
+  const navGroups = useMemo(() => {
+    const groups = [...NAV_GROUPS];
+    if (config?.enable_audits) {
+      groups.splice(1, 0, {
+        label: "Audit & Optimization",
+        items: [
+          { id: "audit", label: "Overview", icon: Globe },
+          { id: "audit-security", label: "Security Posture", icon: Shield },
+          { id: "audit-performance", label: "Performance", icon: Zap },
+          { id: "audit-dns", label: "DNS & Email", icon: Mail },
+        ],
+      });
+    }
+    return groups;
+  }, [config?.enable_audits]);
 
   useCloudflareAccounts();
 
@@ -422,13 +458,13 @@ export function Layout() {
     return () => { if (unlisteners) unlisteners(); };
   }, []);
 
-  const currentNav = NAV_GROUPS.flatMap((g) => g.items).find(
+  const currentNav = navGroups.flatMap((g) => g.items).find(
     (n) => n.id === activeId,
   );
   const pageTitle = currentNav?.label ?? "CF Studio";
 
   return (
-    <>
+    <AuditZoneProvider>
       <SessionRefreshModal />
       <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
         {/* Sidebar */}
@@ -438,6 +474,7 @@ export function Layout() {
           onNavigate={setActiveId}
           userProfile={userProfile}
           activeAccount={activeAccount}
+          navGroups={navGroups}
         />
 
         {/* Main column */}
@@ -456,6 +493,6 @@ export function Layout() {
           </main>
         </div>
       </div>
-    </>
+    </AuditZoneProvider>
   );
 }

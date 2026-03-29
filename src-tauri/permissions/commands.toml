@@ -34,7 +34,14 @@ commands.allow = [
     "get_paginated_history",
     "get_global_stats",
     "clear_query_history",
-    "get_history_debug_status"
+    "get_history_debug_status",
+    "is_pro_enabled",
+    "list_cf_zones",
+    "get_zone_security_settings",
+    "update_zone_setting",
+    "validate_zone_token",
+    "save_zone_token",
+    "has_zone_token"
 ]
 
 [[permission]]
