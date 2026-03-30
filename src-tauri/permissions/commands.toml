@@ -40,7 +40,9 @@ commands.allow = [
     "get_zone_security_settings",
     "update_zone_setting",
     "validate_zone_token",
+    "verify_global_token",
     "save_zone_token",
+    "delete_zone_token",
     "has_zone_token",
     "get_zone_performance_settings"
 ]

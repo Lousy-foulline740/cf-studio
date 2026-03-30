@@ -18,8 +18,6 @@ use crate::r2::{R2Error, resolve_account_id, delete_r2_object};
 use crate::UploadState;
 
 use tauri::Emitter;
-use tokio_util::codec::{BytesCodec, FramedRead};
-use futures_util::stream::StreamExt;
 
 // ── Pro-only event payload types ───────────────────────────────────────────────
 
@@ -210,6 +208,9 @@ pub async fn empty_r2_bucket(
     Ok(())
 }
 
+/// Threshold above which we switch to wrangler multipart upload (100 MB).
+const MULTIPART_THRESHOLD: u64 = 100 * 1024 * 1024;
+
 #[tauri::command]
 pub async fn upload_r2_object(
     app: tauri::AppHandle,
@@ -233,23 +234,61 @@ pub async fn upload_r2_object(
     let total_bytes = metadata.len();
     let mime_type = mime_guess::from_path(&local_path).first_or_octet_stream();
 
-    let token = tokio_util::sync::CancellationToken::new();
+    let cancel_token = tokio_util::sync::CancellationToken::new();
     {
         let mut map = state.cancel_tokens.lock().await;
-        map.insert(upload_id.clone(), token.clone());
+        map.insert(upload_id.clone(), cancel_token.clone());
     }
 
-    let file = tokio::fs::File::open(&local_path).await?;
-    let mut framed = FramedRead::new(file, BytesCodec::new());
+    let result = if total_bytes >= MULTIPART_THRESHOLD {
+        upload_multipart(
+            &app, &client, &cancel_token,
+            &account_id, &bucket_name, &key, &local_path,
+            &upload_id, total_bytes, &mime_type,
+        ).await
+    } else {
+        upload_single_put(
+            &app, &client, &cancel_token,
+            &account_id, &bucket_name, &key, &local_path,
+            &upload_id, total_bytes, &mime_type,
+        ).await
+    };
 
+    // Clean up cancel token
+    {
+        let mut map = state.cancel_tokens.lock().await;
+        map.remove(&upload_id);
+    }
+
+    result
+}
+
+/// Single PUT upload for files < 100 MB.
+async fn upload_single_put(
+    app: &tauri::AppHandle,
+    client: &CloudflareClient,
+    cancel_token: &tokio_util::sync::CancellationToken,
+    account_id: &str,
+    bucket_name: &str,
+    key: &str,
+    local_path: &str,
+    upload_id: &str,
+    total_bytes: u64,
+    mime_type: &mime_guess::mime::Mime,
+) -> Result<(), R2Error> {
+    use tokio_util::codec::{BytesCodec, FramedRead};
+    use futures_util::stream::StreamExt;
+
+    let file = tokio::fs::File::open(local_path).await?;
+    let mut framed = FramedRead::new(file, BytesCodec::new());
     let mut uploaded = 0u64;
     let app_clone = app.clone();
-    let uid_clone = upload_id.clone();
-    let token_clone = token.clone();
+    let uid = upload_id.to_string();
+    let ct = cancel_token.clone();
 
     let stream = async_stream::stream! {
         while let Some(res) = framed.next().await {
-            if token_clone.is_cancelled() {
+            if ct.is_cancelled() {
                 yield Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "Upload cancelled"));
                 break;
             }
@@ -258,15 +297,13 @@ pub async fn upload_r2_object(
                     let chunk_len = bytes.len() as u64;
                     uploaded += chunk_len;
                     let _ = app_clone.emit("upload-progress", UploadProgress {
-                        upload_id: uid_clone.clone(),
+                        upload_id: uid.clone(),
                         bytes_uploaded: uploaded,
                         total_bytes,
                     });
                     yield Ok(bytes.freeze());
                 }
-                Err(e) => {
-                    yield Err(e);
-                }
+                Err(e) => yield Err(e),
             }
         }
     };
@@ -274,7 +311,7 @@ pub async fn upload_r2_object(
     let body = reqwest::Body::wrap_stream(stream);
     let url = format!(
         "accounts/{}/r2/buckets/{}/objects/{}",
-        account_id, bucket_name, urlencoding::encode(&key)
+        account_id, bucket_name, urlencoding::encode(key)
     );
 
     let resp = client
@@ -284,12 +321,7 @@ pub async fn upload_r2_object(
         .send()
         .await;
 
-    {
-        let mut map = state.cancel_tokens.lock().await;
-        map.remove(&upload_id);
-    }
-
-    if token.is_cancelled() {
+    if cancel_token.is_cancelled() {
         return Err(R2Error::Api("Cancelled by user".into()));
     }
 
@@ -298,8 +330,92 @@ pub async fn upload_r2_object(
         let text = resp.text().await.unwrap_or_default();
         return Err(R2Error::Api(format!("Upload failed: {}", text)));
     }
-
     Ok(())
+}
+
+/// Multipart upload for files >= 100 MB using `wrangler r2 object put`.
+/// Wrangler handles multipart internally and uses the existing OAuth token.
+async fn upload_multipart(
+    app: &tauri::AppHandle,
+    _client: &CloudflareClient,
+    cancel_token: &tokio_util::sync::CancellationToken,
+    _account_id: &str,
+    bucket_name: &str,
+    key: &str,
+    local_path: &str,
+    upload_id: &str,
+    total_bytes: u64,
+    _mime_type: &mime_guess::mime::Mime,
+) -> Result<(), R2Error> {
+    use tokio::process::Command;
+
+    // Emit initial progress
+    let _ = app.emit("upload-progress", UploadProgress {
+        upload_id: upload_id.to_string(),
+        bytes_uploaded: 0,
+        total_bytes,
+    });
+
+    // Build the wrangler command via login shell so PATH is inherited.
+    // Use `npx -y wrangler` to skip install prompts.
+    let wrangler_cmd = format!(
+        "WRANGLER_SEND_METRICS=false npx -y wrangler r2 object put '{}/{}' --file '{}'",
+        bucket_name, key, local_path
+    );
+
+    let (shell, login_flag) = if cfg!(target_os = "macos") {
+        ("zsh", "-l")
+    } else {
+        ("bash", "-l")
+    };
+
+    let mut child = Command::new(shell)
+        .args([login_flag, "-c", &wrangler_cmd])
+        .env("WRANGLER_SEND_METRICS", "false")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| R2Error::Api(format!(
+            "Failed to launch wrangler. Is it installed? Error: {}", e
+        )))?;
+
+    // Take stdout/stderr handles before waiting (so child isn't consumed)
+    let mut child_stderr = child.stderr.take();
+
+    // Poll for cancellation while wrangler runs
+    let cancel = cancel_token.clone();
+    let result = tokio::select! {
+        status = child.wait() => {
+            match status {
+                Ok(exit) if exit.success() => Ok(()),
+                Ok(_) => {
+                    // Read stderr for the actual error
+                    let mut detail = String::new();
+                    if let Some(ref mut stderr) = child_stderr {
+                        use tokio::io::AsyncReadExt;
+                        let _ = stderr.read_to_string(&mut detail).await;
+                    }
+                    Err(R2Error::Api(format!("Wrangler upload failed: {}", detail.trim())))
+                }
+                Err(e) => Err(R2Error::Api(format!("Wrangler process error: {}", e))),
+            }
+        }
+        _ = cancel.cancelled() => {
+            let _ = child.kill().await;
+            Err(R2Error::Api("Cancelled by user".into()))
+        }
+    };
+
+    if result.is_ok() {
+        // Emit completion progress
+        let _ = app.emit("upload-progress", UploadProgress {
+            upload_id: upload_id.to_string(),
+            bytes_uploaded: total_bytes,
+            total_bytes,
+        });
+    }
+
+    result
 }
 
 /// Cancels an active upload and attempts to delete the partial object.

@@ -33,9 +33,10 @@ import {
 } from "@/store/useAppStore";
 import { invokeCloudflare, useCloudflareAccounts } from "@/hooks/useCloudflare";
 import { useRemoteConfig } from "@/pro_modules/frontend/useRemoteConfig";
-import { AuditZoneProvider } from "@/pro_modules/frontend/AuditZoneContext";
+import { AuditZoneProvider, AuditTokenGate } from "@/pro_modules/frontend/AuditZoneContext";
 import { SecurityPosture } from "@/pro_modules/ui/audits/SecurityPosture";
 import { PerformancePosture } from "@/pro_modules/ui/audits/PerformancePosture";
+import { AuditPreferences } from "@/pro_modules/ui/audits/AuditPreferences";
 import { useMemo } from "react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -385,14 +386,17 @@ function PageContent({ activeId }: { activeId: string }) {
   if (activeId === "d1") return <DatabasesView />;
   if (activeId === "r2") return <R2BucketsView />;
   if (activeId === "settings") return <SettingsView />;
-  if (activeId === "audit-security") return <SecurityPosture />;
-  if (activeId === "audit-performance") return <PerformancePosture />;
+  if (activeId === "audit-security") return <AuditTokenGate><SecurityPosture /></AuditTokenGate>;
+  if (activeId === "audit-performance") return <AuditTokenGate><PerformancePosture /></AuditTokenGate>;
+  if (activeId === "audit-preferences") return <AuditPreferences />;
   
   if (activeId.startsWith("audit")) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center gap-2">
-        <p className="text-muted-foreground text-sm">Audit view coming soon</p>
-      </div>
+      <AuditTokenGate>
+        <div className="flex flex-col items-center justify-center h-full text-center gap-2">
+          <p className="text-muted-foreground text-sm">Audit view coming soon</p>
+        </div>
+      </AuditTokenGate>
     );
   }
 
@@ -424,6 +428,7 @@ export function Layout() {
           { id: "audit-security", label: "Security Posture", icon: Shield },
           { id: "audit-performance", label: "Performance", icon: Zap },
           { id: "audit-dns", label: "DNS & Email", icon: Mail },
+          { id: "audit-preferences", label: "Preferences", icon: Settings },
         ],
       });
     }

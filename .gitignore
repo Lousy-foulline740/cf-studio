@@ -23,3 +23,4 @@ dist-ssr
 *.sln
 *.sw?
 others/
+src-tauri/.wrangler

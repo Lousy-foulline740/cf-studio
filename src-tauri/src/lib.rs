@@ -169,7 +169,9 @@ pub fn run() {
             domain_audit_pro::get_zone_security_settings,
             domain_audit_pro::update_zone_setting,
             domain_audit_pro::validate_zone_token,
+            domain_audit_pro::verify_global_token,
             domain_audit_pro::save_zone_token,
+            domain_audit_pro::delete_zone_token,
             domain_audit_pro::has_zone_token,
             domain_audit_pro::get_zone_performance_settings,
             // ── R2 Public ──
