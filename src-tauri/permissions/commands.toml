@@ -41,7 +41,8 @@ commands.allow = [
     "update_zone_setting",
     "validate_zone_token",
     "save_zone_token",
-    "has_zone_token"
+    "has_zone_token",
+    "get_zone_performance_settings"
 ]
 
 [[permission]]

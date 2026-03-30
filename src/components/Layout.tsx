@@ -35,6 +35,7 @@ import { invokeCloudflare, useCloudflareAccounts } from "@/hooks/useCloudflare";
 import { useRemoteConfig } from "@/pro_modules/frontend/useRemoteConfig";
 import { AuditZoneProvider } from "@/pro_modules/frontend/AuditZoneContext";
 import { SecurityPosture } from "@/pro_modules/ui/audits/SecurityPosture";
+import { PerformancePosture } from "@/pro_modules/ui/audits/PerformancePosture";
 import { useMemo } from "react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -385,6 +386,7 @@ function PageContent({ activeId }: { activeId: string }) {
   if (activeId === "r2") return <R2BucketsView />;
   if (activeId === "settings") return <SettingsView />;
   if (activeId === "audit-security") return <SecurityPosture />;
+  if (activeId === "audit-performance") return <PerformancePosture />;
   
   if (activeId.startsWith("audit")) {
     return (
