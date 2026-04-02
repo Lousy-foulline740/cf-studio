@@ -63,7 +63,7 @@ jobs:
             fi
 
             echo "---"
-            echo "### Quick Install"
+            echo "### Quick Install / Update"
             echo ""
             echo "**For macOS/Linux (Bash Terminal):**"
             echo "\`\`\`bash"
