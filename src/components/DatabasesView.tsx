@@ -78,18 +78,32 @@ interface EmptyStateProps {
 }
 
 function EmptyState({ variant, message, onRefresh, accountId }: EmptyStateProps) {
+  const { toast } = useToast();
   const handleCopyCommand = async () => {
     try {
       await navigator.clipboard.writeText("npx wrangler login");
+      toast({
+        title: "Copied",
+        description: "Login command copied to clipboard.",
+      });
     } catch (e) {
       console.error(e);
     }
   };
 
   const handleRunCommand = async () => {
+    toast({
+      title: "Opening Terminal",
+      description: "Launching wrangler login in a new terminal window...",
+    });
     try {
       await invokeCloudflare("run_wrangler_login");
     } catch (e) {
+      toast({
+        title: "Launch Failed",
+        description: String(e),
+        variant: "destructive",
+      });
       console.error(e);
     }
   };

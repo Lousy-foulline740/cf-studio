@@ -296,20 +296,24 @@ pub async fn refresh_wrangler_token() -> Result<CloudflareCredentials, AuthError
 #[tauri::command]
 pub async fn run_wrangler_login() -> Result<(), AuthError> {
     tokio::task::spawn_blocking(|| {
-        let mut cmd = if cfg!(target_os = "windows") {
+        if cfg!(target_os = "windows") {
             let mut c = std::process::Command::new("cmd");
             // use start to pop open a cmd window so they can see the prompt if any
             c.args(["/c", "start", "cmd", "/c", "npx wrangler login ^&^& pause"]);
-            c
+            let _ = c.output();
+        } else if cfg!(target_os = "macos") {
+            // On macOS, use osascript to spawn a new Terminal window.
+            // This provides a TTY for wrangler and allows the user to see the login flow status.
+            let mut c = std::process::Command::new("osascript");
+            let script = "tell application \"Terminal\" to do script \"npx wrangler login\"";
+            c.args(["-e", script]);
+            let _ = c.output();
         } else {
             let mut c = std::process::Command::new("sh");
-            // on macOS/Linux it should open the browser directly or we can use open/xdg-open
+            // on Linux we fall back to background shell
             c.args(["-c", "npx wrangler login"]);
-            c
+            let _ = c.output();
         };
-
-        // Run silently
-        let _ = cmd.output();
     })
     .await
     .map_err(|e| AuthError::ExecError(e.to_string()))?;
