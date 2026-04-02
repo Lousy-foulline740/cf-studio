@@ -4,7 +4,7 @@ A blazing-fast, native desktop client for Cloudflare D1 and R2.
 
 [Website](https://cfstudio.dev) • [Portfolio](https://mubashar.dev) • [YouTube](https://youtube.com/@mubashardev)
 
-## Install
+## Install / Update
 
 For macOS/Linux (Bash Terminal):
 ```bash
